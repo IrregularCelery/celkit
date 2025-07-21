@@ -3,7 +3,17 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub enum Number {
+    U8(u8),
+    I8(i8),
+    U16(u16),
+    I16(i16),
+    U32(u32),
+    I32(i32),
+    U64(u64),
     I64(i64),
+    U128(u128),
+    I128(i128),
+    F32(f32),
     F64(f64),
 }
 
@@ -20,7 +30,7 @@ pub enum Value {
 }
 
 #[derive(Debug)]
-struct Error {
+pub struct Error {
     pub message: String,
     pub context: Option<String>,
     pub line: Option<usize>,
@@ -95,5 +105,5 @@ pub trait Serialize {
 }
 
 pub trait Deserialize: Sized {
-    fn deserialize(&self) -> Result<Self>;
+    fn deserialize(value: Value) -> Result<Self>;
 }
