@@ -20,11 +20,11 @@ pub enum Number {
 #[derive(Debug, Clone)]
 pub enum Value {
     Null,
-    Bool(bool),
+    Boolean(bool),
     Number(Number),
-    String(String),
+    Text(String),
     Array(Vec<Value>),
-    Group(Vec<Value>),
+    Tuple(Vec<Value>),
     Object(HashMap<String, Value>),
     Struct(String, HashMap<String, Value>),
 }
