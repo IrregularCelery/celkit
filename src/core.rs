@@ -1,7 +1,7 @@
 use core::fmt;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Number {
     U8(u8),
     I8(i8),
@@ -15,6 +15,25 @@ pub enum Number {
     I128(i128),
     F32(f32),
     F64(f64),
+}
+
+impl Number {
+    pub fn to_string(&self) -> String {
+        match self {
+            Number::U8(number) => number.to_string(),
+            Number::I8(number) => number.to_string(),
+            Number::U16(number) => number.to_string(),
+            Number::I16(number) => number.to_string(),
+            Number::U32(number) => number.to_string(),
+            Number::I32(number) => number.to_string(),
+            Number::U64(number) => number.to_string(),
+            Number::I64(number) => number.to_string(),
+            Number::U128(number) => number.to_string(),
+            Number::I128(number) => number.to_string(),
+            Number::F32(number) => number.to_string(),
+            Number::F64(number) => number.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -56,7 +75,7 @@ impl Error {
         }
     }
 
-    pub fn with_context_and_suggestion(
+    pub fn with_context(
         message: impl Into<String>,
         context: impl Into<String>,
         line: usize,
