@@ -1,7 +1,8 @@
-pub trait Serialize {
-    fn serialize(&self);
-}
+mod core;
+mod impls;
 
-pub trait Deserialize {
-    fn deserialize(&self);
+pub use core::{Deserialize, Serialize};
+
+pub mod internal {
+    pub use crate::core::{Error, Number, Result, Value};
 }
