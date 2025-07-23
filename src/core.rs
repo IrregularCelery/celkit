@@ -1,5 +1,5 @@
+use crate::lib::*;
 use core::fmt;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
@@ -44,8 +44,8 @@ pub enum Value {
     Text(String),
     Array(Vec<Value>),
     Tuple(Vec<Value>),
-    Object(HashMap<String, Value>),
-    Struct(String, HashMap<String, Value>),
+    Object(BTreeMap<String, Value>),
+    Struct(String, BTreeMap<String, Value>),
 }
 
 #[derive(Debug)]

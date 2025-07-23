@@ -1,5 +1,6 @@
 use crate::core::{Deserialize, Serialize};
 use crate::internal::{Error, Number, Result, Value};
+use crate::lib::*;
 
 // ------------------------------- Helpers -------------------------------- //
 
@@ -141,22 +142,22 @@ macro_rules! impl_for_integer {
 }
 
 macro_rules! impl_for_tuple {
-    ($($T:ident),+) => {
-        impl<$($T: Serialize),+> Serialize for ($($T,)+) {
+    ($($member:ident),+) => {
+        impl<$($member: Serialize),+> Serialize for ($($member,)+) {
             fn serialize(&self) -> Result<Value> {
                 #[allow(non_snake_case)]
-                let ($($T,)+) = self;
+                let ($($member,)+) = self;
 
-                Ok(Value::Tuple(vec![$($T.serialize()?),+]))
+                Ok(Value::Tuple(Vec::from([$($member.serialize()?),+])))
             }
         }
 
-        impl<$($T: Deserialize),+> Deserialize for ($($T,)+) {
+        impl<$($member: Deserialize),+> Deserialize for ($($member,)+) {
             fn deserialize(value: Value) -> Result<Self> {
                 match value {
                     Value::Tuple(mut tuple) => {
                         const EXPECTED_LEN: usize = 0
-                            $(+ { let _ = stringify!($T); 1 })*;
+                            $(+ { let _ = stringify!($member); 1 })*;
 
                         if tuple.len() != EXPECTED_LEN {
                             return Err(Error::new(format!(
@@ -170,7 +171,7 @@ macro_rules! impl_for_tuple {
                         tuple.reverse();
 
                         Ok(($(
-                            $T::deserialize(tuple.pop().unwrap())?
+                            $member::deserialize(tuple.pop().unwrap())?
                         ),+,))
                     }
                     _ => Err(Error::new("Expected tuple")),
@@ -371,9 +372,10 @@ impl_for_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
 // ------------------------------- HashMap -------------------------------- //
 
+#[cfg(feature = "std")]
 impl<K: Into<String> + Clone, V: Serialize> Serialize for std::collections::HashMap<K, V> {
     fn serialize(&self) -> Result<Value> {
-        let mut values = std::collections::HashMap::with_capacity(self.len());
+        let mut values = BTreeMap::new();
 
         for (key, value) in self {
             values.insert(key.clone().into(), value.serialize()?);
@@ -383,6 +385,7 @@ impl<K: Into<String> + Clone, V: Serialize> Serialize for std::collections::Hash
     }
 }
 
+#[cfg(feature = "std")]
 impl<V: Deserialize> Deserialize for std::collections::HashMap<String, V> {
     fn deserialize(value: Value) -> Result<Self> {
         match value {
@@ -422,7 +425,7 @@ macro_rules! impl_for_struct {
 
         impl $crate::Serialize for $name {
             fn serialize(&self) -> $crate::internal::Result<$crate::internal::Value> {
-                let mut map = std::collections::HashMap::new();
+                let mut map = $crate::lib::BTreeMap::new();
 
                 $(
                     map.insert(
