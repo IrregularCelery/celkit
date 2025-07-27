@@ -12,3 +12,10 @@ dependencies = [
 [[package]]
 name = "celkit-core"
 version = "0.1.0"
+
+[[package]]
+name = "celkit-string"
+version = "0.1.0"
+dependencies = [
+ "celkit-core",
+]

@@ -2,7 +2,8 @@
 resolver = "2"
 members = [
   "celkit",
-  "celkit_core"
+  "celkit_core",
+  "celkit_string"
 ]
 
 [workspace.package]
