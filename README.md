@@ -1,1 +1,3 @@
-# Celery Expressive Language (.cel)
+# Celkit
+
+### Serialization toolkit for **Celery Expressive Language (.cel)**
