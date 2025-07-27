@@ -1,10 +1,12 @@
-[package]
-name = "cel"
+[workspace]
+resolver = "2"
+members = [
+  "cel",
+  "cel_core"
+]
+
+[workspace.package]
 version = "0.1.0"
+authors = ["Mohsen Rad (🌱) <irregular.celery@gmail.com>"]
 edition = "2021"
-
-[features]
-default = ["std"]
-std = []
-
-[dependencies]
+license = "MIT"

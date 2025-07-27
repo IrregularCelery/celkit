@@ -1,0 +1,15 @@
+[package]
+name = "cel"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = ["std"]
+std = [
+  "cel-core/std"
+]
+
+[dependencies]
+cel-core = { path = "../cel_core/" }
