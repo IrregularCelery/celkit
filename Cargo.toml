@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-  "cel",
-  "cel_core"
+  "celkit",
+  "celkit_core"
 ]
 
 [workspace.package]

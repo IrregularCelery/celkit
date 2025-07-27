@@ -1,15 +1,11 @@
 [package]
-name = "cel"
+name = "celkit-core"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [features]
-default = ["std"]
-std = [
-  "cel-core/std"
-]
+std = []
 
 [dependencies]
-cel-core = { path = "../cel_core/" }
