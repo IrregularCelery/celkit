@@ -6,8 +6,9 @@ edition.workspace = true
 license.workspace = true
 
 [features]
+default = []
 std = [
-  "celkit-core/std"
+  "celkit-core/std",
 ]
 
 [dependencies]
