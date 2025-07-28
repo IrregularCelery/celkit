@@ -27,7 +27,7 @@ mod mini {
     use crate::encode::general::escape_text;
     use celkit_core::internal::{Result, Value};
 
-    fn encode_value(value: &Value) -> Result<String> {
+    pub(crate) fn encode_value(value: &Value) -> Result<String> {
         match value {
             Value::Null => Ok("null".to_string()),
             Value::Boolean(b) => Ok(b.to_string()),
@@ -67,6 +67,12 @@ mod mini {
     }
 }
 
-pub fn to_string() {
-    assert!(false, "`to_string()` is not implemented yet!")
+pub fn to_string<T: ?Sized + celkit_core::Serialize>(
+    value: &T,
+) -> celkit_core::internal::Result<String> {
+    let serialized = value.serialize()?;
+
+    // TODO: CHANGE THIS!!!
+    // `to_string()` is supposed to be the default function with the prettified format
+    mini::encode_value(&serialized)
 }
