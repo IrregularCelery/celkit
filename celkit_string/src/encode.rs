@@ -1,30 +1,28 @@
-// Minified formatting (single-line compact)
-mod general {
-    pub(crate) fn escape_text(input: &str) -> String {
-        let mut output = String::new();
+fn escape_text(input: &str) -> String {
+    let mut output = String::new();
 
-        for c in input.chars() {
-            match c {
-                '\x08' => output.push_str("\\b"), // Backspace                \b
-                '\x0C' => output.push_str("\\f"), // Formfeed Page Break      \f
-                '\n' => output.push_str("\\n"),   // Newline (Line Feed)      \n
-                '\r' => output.push_str("\\r"),   // Carriage Return          \r
-                '\t' => output.push_str("\\t"),   // Horizontal Tab           \t
-                '\\' => output.push_str("\\\\"),  // Backslash                \\
-                '"' => output.push_str("\\\""),   // Double quotation mark    \"
-                c if c.is_control() => {
-                    output.push_str(&format!("\\u{:04x}", c as u32));
-                }
-                c => output.push(c),
+    for c in input.chars() {
+        match c {
+            '\x08' => output.push_str("\\b"), // Backspace                \b
+            '\x0C' => output.push_str("\\f"), // Formfeed Page Break      \f
+            '\n' => output.push_str("\\n"),   // Newline (Line Feed)      \n
+            '\r' => output.push_str("\\r"),   // Carriage Return          \r
+            '\t' => output.push_str("\\t"),   // Horizontal Tab           \t
+            '\\' => output.push_str("\\\\"),  // Backslash                \\
+            '"' => output.push_str("\\\""),   // Double quotation mark    \"
+            c if c.is_control() => {
+                output.push_str(&format!("\\u{:04x}", c as u32));
             }
+            c => output.push(c),
         }
-
-        output
     }
+
+    output
 }
 
+/// Minified encoding (single-line)
 mod mini {
-    use crate::encode::general::escape_text;
+    use crate::encode::escape_text;
     use celkit_core::internal::{Result, Value};
 
     pub(crate) fn encode_value(value: &Value) -> Result<String> {
