@@ -17,8 +17,8 @@ pub enum Number {
     F64(f64),
 }
 
-impl Number {
-    pub fn to_string(&self) -> String {
+impl ToString for Number {
+    fn to_string(&self) -> String {
         match self {
             Number::U8(number) => number.to_string(),
             Number::I8(number) => number.to_string(),
