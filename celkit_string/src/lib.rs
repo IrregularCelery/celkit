@@ -1,7 +1,5 @@
-pub fn to_string() {
-    assert!(false, "`to_string()` is not implemented yet!")
-}
+mod decode;
+mod encode;
 
-pub fn from_string() {
-    assert!(false, "`from_string()` is not implemented yet!")
-}
+pub use decode::from_string;
+pub use encode::to_string;
