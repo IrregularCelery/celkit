@@ -149,3 +149,11 @@ pub fn to_mini<T: ?Sized + celkit_core::Serialize>(
 
     mini::Encoder::new(&serialized).encode()
 }
+
+pub fn to_pretty<T: ?Sized + celkit_core::Serialize>(
+    value: &T,
+) -> celkit_core::internal::Result<String> {
+    let serialized = value.serialize()?;
+
+    pretty::Encoder::new(&serialized).encode()
+}
