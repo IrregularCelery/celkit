@@ -25,52 +25,80 @@ mod mini {
     use crate::encode::escape_text;
     use celkit_core::internal::{Result, Value};
 
-    pub(crate) fn encode_value(value: &Value) -> Result<String> {
-        match value {
-            Value::Null => Ok("null".to_string()),
-            Value::Boolean(b) => Ok(b.to_string()),
-            Value::Number(n) => Ok(n.to_string()),
-            Value::Text(t) => Ok(format!("\"{}\"", escape_text(t))),
-            Value::Array(a) => {
-                let items: Result<Vec<String>> = a.iter().map(encode_value).collect();
-                let items = items?;
+    pub struct Encoder<'a> {
+        value: &'a Value,
+    }
 
-                Ok(format!("[{}]", items.join(",")))
-            }
-            Value::Tuple(t) => {
-                let members: Result<Vec<String>> = t.iter().map(encode_value).collect();
-                let members = members?;
+    impl<'a> Encoder<'a> {
+        pub fn new(value: &'a Value) -> Self {
+            Self { value }
+        }
 
-                Ok(format!("({})", members.join(",")))
-            }
-            Value::Object(o) => {
-                let mut entries = Vec::new();
+        pub fn encode(self) -> Result<String> {
+            self.encode_value(self.value)
+        }
 
-                for (key, value) in o {
-                    entries.push(format!("\"{}\":{}", escape_text(key), encode_value(value)?));
+        fn encode_value(&self, value: &Value) -> Result<String> {
+            match value {
+                Value::Null => Ok("null".to_string()),
+                Value::Boolean(b) => Ok(b.to_string()),
+                Value::Number(n) => Ok(n.to_string()),
+                Value::Text(t) => Ok(format!("\"{}\"", escape_text(t))),
+                Value::Array(a) => {
+                    let items: Result<Vec<String>> =
+                        a.iter().map(|v| self.encode_value(v)).collect();
+                    let items = items?;
+
+                    Ok(format!("[{}]", items.join(",")))
                 }
+                Value::Tuple(t) => {
+                    let members: Result<Vec<String>> =
+                        t.iter().map(|v| self.encode_value(v)).collect();
+                    let members = members?;
 
-                Ok(format!("{{{}}}", entries.join(",")))
-            }
-            Value::Struct(_, s) => {
-                let mut fields = Vec::new();
-
-                for (key, value) in s {
-                    fields.push(format!("{}={}", key, encode_value(value)?));
+                    Ok(format!("({})", members.join(",")))
                 }
+                Value::Object(o) => {
+                    let entries: Result<Vec<String>> = o
+                        .iter()
+                        .map(|(k, v)| {
+                            Ok(format!("\"{}\":{}", escape_text(k), self.encode_value(v)?))
+                        })
+                        .collect();
+                    let entries = entries?;
 
-                Ok(format!("@({})", fields.join(",")))
+                    Ok(format!("{{{}}}", entries.join(",")))
+                }
+                Value::Struct(_, s) => {
+                    let fields: Result<Vec<String>> = s
+                        .iter()
+                        .map(|(k, v)| Ok(format!("{}={}", k, self.encode_value(v)?)))
+                        .collect();
+                    let fields = fields?;
+
+                    Ok(format!("@({})", fields.join(",")))
+                }
             }
         }
     }
 }
 
+mod pretty {}
+
 pub fn to_string<T: ?Sized + celkit_core::Serialize>(
+    value: &T,
+) -> celkit_core::internal::Result<String> {
+    let _serialized = value.serialize()?;
+
+    // TODO: CHANGE THIS!!!
+    // `to_string()` is supposed to be the default function with the prettified format
+    todo!()
+}
+
+pub fn to_mini<T: ?Sized + celkit_core::Serialize>(
     value: &T,
 ) -> celkit_core::internal::Result<String> {
     let serialized = value.serialize()?;
 
-    // TODO: CHANGE THIS!!!
-    // `to_string()` is supposed to be the default function with the prettified format
-    mini::encode_value(&serialized)
+    mini::Encoder::new(&serialized).encode()
 }
