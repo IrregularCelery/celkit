@@ -1,3 +1,5 @@
+use celkit_core::internal::sys::*;
+
 fn escape_text(input: &str) -> String {
     let mut output = String::new();
 
@@ -23,7 +25,8 @@ fn escape_text(input: &str) -> String {
 /// Minified encoding (single-line)
 mod mini {
     use crate::encode::escape_text;
-    use celkit_core::internal::{Result, Value};
+    use celkit_core::internal::sys::*;
+    use celkit_core::internal::{Number, Result, Value};
 
     pub struct Encoder {
         value: Value,
@@ -38,46 +41,66 @@ mod mini {
             self.encode_value(&self.value)
         }
 
+        fn encode_null(&self) -> Result<String> {
+            Ok("null".to_string())
+        }
+
+        fn encode_boolean(&self, value: &bool) -> Result<String> {
+            Ok(value.to_string())
+        }
+
+        fn encode_number(&self, value: &Number) -> Result<String> {
+            Ok(value.to_string())
+        }
+
+        fn encode_text(&self, value: &String) -> Result<String> {
+            Ok(format!("\"{}\"", escape_text(value)))
+        }
+
+        fn encode_array(&self, value: &Vec<Value>) -> Result<String> {
+            let items: Result<Vec<String>> = value.iter().map(|v| self.encode_value(v)).collect();
+            let items = items?;
+
+            Ok(format!("[{}]", items.join(",")))
+        }
+
+        fn encode_tuple(&self, value: &Vec<Value>) -> Result<String> {
+            let members: Result<Vec<String>> = value.iter().map(|v| self.encode_value(v)).collect();
+            let members = members?;
+
+            Ok(format!("({})", members.join(",")))
+        }
+
+        fn encode_object(&self, value: &BTreeMap<String, Value>) -> Result<String> {
+            let entries: Result<Vec<String>> = value
+                .iter()
+                .map(|(k, v)| Ok(format!("\"{}\":{}", escape_text(k), self.encode_value(v)?)))
+                .collect();
+            let entries = entries?;
+
+            Ok(format!("{{{}}}", entries.join(",")))
+        }
+
+        fn encode_struct(&self, value: &BTreeMap<String, Value>) -> Result<String> {
+            let fields: Result<Vec<String>> = value
+                .iter()
+                .map(|(k, v)| Ok(format!("{}={}", k, self.encode_value(v)?)))
+                .collect();
+            let fields = fields?;
+
+            Ok(format!("@({})", fields.join(",")))
+        }
+
         fn encode_value(&self, value: &Value) -> Result<String> {
             match value {
-                Value::Null => Ok("null".to_string()),
-                Value::Boolean(b) => Ok(b.to_string()),
-                Value::Number(n) => Ok(n.to_string()),
-                Value::Text(t) => Ok(format!("\"{}\"", escape_text(t))),
-                Value::Array(a) => {
-                    let items: Result<Vec<String>> =
-                        a.iter().map(|v| self.encode_value(v)).collect();
-                    let items = items?;
-
-                    Ok(format!("[{}]", items.join(",")))
-                }
-                Value::Tuple(t) => {
-                    let members: Result<Vec<String>> =
-                        t.iter().map(|v| self.encode_value(v)).collect();
-                    let members = members?;
-
-                    Ok(format!("({})", members.join(",")))
-                }
-                Value::Object(o) => {
-                    let entries: Result<Vec<String>> = o
-                        .iter()
-                        .map(|(k, v)| {
-                            Ok(format!("\"{}\":{}", escape_text(k), self.encode_value(v)?))
-                        })
-                        .collect();
-                    let entries = entries?;
-
-                    Ok(format!("{{{}}}", entries.join(",")))
-                }
-                Value::Struct(_, s) => {
-                    let fields: Result<Vec<String>> = s
-                        .iter()
-                        .map(|(k, v)| Ok(format!("{}={}", k, self.encode_value(v)?)))
-                        .collect();
-                    let fields = fields?;
-
-                    Ok(format!("@({})", fields.join(",")))
-                }
+                Value::Null => self.encode_null(),
+                Value::Boolean(b) => self.encode_boolean(b),
+                Value::Number(n) => self.encode_number(n),
+                Value::Text(t) => self.encode_text(t),
+                Value::Array(a) => self.encode_array(a),
+                Value::Tuple(t) => self.encode_tuple(t),
+                Value::Object(o) => self.encode_object(o),
+                Value::Struct(_, s) => self.encode_struct(s),
             }
         }
     }
@@ -86,6 +109,7 @@ mod mini {
 /// Prettified encoding (multi-line)
 mod pretty {
     use crate::encode::escape_text;
+    use celkit_core::internal::sys::*;
     use celkit_core::internal::{Result, Value};
 
     pub struct Encoder {
