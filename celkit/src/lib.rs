@@ -7,4 +7,4 @@ pub mod macros {
 }
 
 #[cfg(feature = "string")]
-pub use celkit_string::{from_string, to_string};
+pub use celkit_string::{from_string, to_mini, to_string};
