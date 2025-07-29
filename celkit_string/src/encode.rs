@@ -25,17 +25,17 @@ mod mini {
     use crate::encode::escape_text;
     use celkit_core::internal::{Result, Value};
 
-    pub struct Encoder<'a> {
-        value: &'a Value,
+    pub struct Encoder {
+        value: Value,
     }
 
-    impl<'a> Encoder<'a> {
-        pub fn new(value: &'a Value) -> Self {
+    impl Encoder {
+        pub fn new(value: Value) -> Self {
             Self { value }
         }
 
         pub fn encode(self) -> Result<String> {
-            self.encode_value(self.value)
+            self.encode_value(&self.value)
         }
 
         fn encode_value(&self, value: &Value) -> Result<String> {
@@ -83,19 +83,20 @@ mod mini {
     }
 }
 
+/// Prettified encoding (multi-line)
 mod pretty {
     use crate::encode::escape_text;
     use celkit_core::internal::{Result, Value};
 
-    pub struct Encoder<'a> {
-        value: &'a Value,
+    pub struct Encoder {
+        value: Value,
         indent_size: usize,
         max_line_length: usize,
         trailing_comma: bool,
     }
 
-    impl<'a> Encoder<'a> {
-        pub fn new(value: &'a Value) -> Self {
+    impl Encoder {
+        pub fn new(value: Value) -> Self {
             Self {
                 value,
                 indent_size: 2,
@@ -123,7 +124,7 @@ mod pretty {
         }
 
         pub fn encode(self) -> Result<String> {
-            self.encode_value(self.value)
+            self.encode_value(&self.value)
         }
 
         fn encode_value(&self, value: &Value) -> Result<String> {
@@ -135,11 +136,9 @@ mod pretty {
 pub fn to_string<T: ?Sized + celkit_core::Serialize>(
     value: &T,
 ) -> celkit_core::internal::Result<String> {
-    let _serialized = value.serialize()?;
+    let serialized = value.serialize()?;
 
-    // TODO: CHANGE THIS!!!
-    // `to_string()` is supposed to be the default function with the prettified format
-    todo!()
+    pretty::Encoder::new(serialized).encode()
 }
 
 pub fn to_mini<T: ?Sized + celkit_core::Serialize>(
@@ -147,7 +146,7 @@ pub fn to_mini<T: ?Sized + celkit_core::Serialize>(
 ) -> celkit_core::internal::Result<String> {
     let serialized = value.serialize()?;
 
-    mini::Encoder::new(&serialized).encode()
+    mini::Encoder::new(serialized).encode()
 }
 
 pub fn to_pretty<T: ?Sized + celkit_core::Serialize>(
@@ -155,5 +154,5 @@ pub fn to_pretty<T: ?Sized + celkit_core::Serialize>(
 ) -> celkit_core::internal::Result<String> {
     let serialized = value.serialize()?;
 
-    pretty::Encoder::new(&serialized).encode()
+    pretty::Encoder::new(serialized).encode()
 }
