@@ -1,4 +1,4 @@
-use crate::lib::*;
+use crate::internal::sys::*;
 use core::fmt;
 
 #[derive(Debug, Clone, PartialEq)]

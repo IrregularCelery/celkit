@@ -1,6 +1,6 @@
 use crate::core::{Deserialize, Serialize};
+use crate::internal::sys::*;
 use crate::internal::{Error, Number, Result, Value};
-use crate::lib::*;
 
 // ------------------------------- Helpers -------------------------------- //
 
@@ -425,7 +425,7 @@ macro_rules! impl_for_struct {
 
         impl $crate::Serialize for $name {
             fn serialize(&self) -> $crate::internal::Result<$crate::internal::Value> {
-                let mut map = $crate::lib::BTreeMap::new();
+                let mut map = $crate::internal::sys::BTreeMap::new();
 
                 $(
                     map.insert(
