@@ -110,7 +110,7 @@ mod mini {
 mod pretty {
     use crate::encode::escape_text;
     use celkit_core::internal::sys::*;
-    use celkit_core::internal::{Result, Value};
+    use celkit_core::internal::{Number, Result, Value};
 
     pub struct Encoder {
         value: Value,
@@ -148,11 +148,125 @@ mod pretty {
         }
 
         pub fn encode(self) -> Result<String> {
-            self.encode_value(&self.value)
+            let indent_level = 0;
+
+            self.encode_value(&self.value, indent_level)
         }
 
-        fn encode_value(&self, value: &Value) -> Result<String> {
+        fn try_single_line_array(&self, value: &Vec<Value>) -> Result<String> {
+            let items: Result<Vec<String>> =
+                value.iter().map(|v| self.encode_value(v, 0)).collect();
+            let items = items?;
+
+            Ok(format!("[{}]", items.join(", ")))
+        }
+
+        fn indent(&self, level: usize) -> String {
+            " ".repeat(level * self.indent_size)
+        }
+
+        fn encode_null(&self) -> Result<String> {
+            Ok("null".to_string())
+        }
+
+        fn encode_boolean(&self, value: &bool) -> Result<String> {
+            Ok(value.to_string())
+        }
+
+        fn encode_number(&self, value: &Number) -> Result<String> {
+            Ok(value.to_string())
+        }
+
+        fn encode_text(&self, value: &String) -> Result<String> {
+            Ok(format!("\"{}\"", escape_text(value)))
+        }
+
+        fn encode_array(&self, value: &Vec<Value>, indent_level: usize) -> Result<String> {
+            if value.is_empty() {
+                return Ok("[]".to_string());
+            }
+
+            let current_indent = self.indent(indent_level);
+            let next_indent = self.indent(indent_level + 1);
+
+            // TODO: THIS ABSOLUTELY HAS TO BE REPLACED WITH A BETTER APPROACH!!!
+            let single_line = self.try_single_line_array(value)?;
+
+            if current_indent.len() + single_line.len() <= self.max_line_length {
+                return Ok(single_line);
+            }
+
+            let mut output = "[\n".to_string();
+            let mut current_line = next_indent.clone();
+            let empty_line_len = next_indent.len();
+
+            for (i, item) in value.iter().enumerate() {
+                let encoded_item = self.encode_value(item, indent_level + 1)?;
+                let mut formatted_item = encoded_item;
+
+                if i < value.len() - 1 || self.trailing_comma {
+                    formatted_item.push_str(", ");
+                }
+
+                // Check if this item would fit in the current line
+                if current_line.len() + formatted_item.len() <= self.max_line_length
+                    || current_line.len() <= empty_line_len
+                {
+                    current_line.push_str(&formatted_item);
+
+                    continue;
+                }
+
+                // Current line has content and would exceed the limit, wrap to next line
+                output.push_str(&current_line.trim_end());
+                output.push('\n');
+
+                current_line = format!("{}{}", next_indent, formatted_item);
+            }
+
+            // Add the last line if it has content
+            if current_line.len() > empty_line_len {
+                output.push_str(&current_line.trim_end());
+                output.push('\n');
+            }
+
+            output.push_str(&current_indent);
+            output.push(']');
+
+            Ok(output)
+        }
+
+        fn encode_tuple(&self, value: &Vec<Value>, indent_level: usize) -> Result<String> {
             todo!()
+        }
+
+        fn encode_object(
+            &self,
+            value: &BTreeMap<String, Value>,
+            indent_level: usize,
+        ) -> Result<String> {
+            todo!()
+        }
+
+        fn encode_struct(
+            &self,
+            value: &BTreeMap<String, Value>,
+            indent_level: usize,
+        ) -> Result<String> {
+            todo!()
+        }
+
+        fn encode_value(&self, value: &Value, indent_level: usize) -> Result<String> {
+            match value {
+                Value::Null => self.encode_null(),
+                Value::Boolean(b) => self.encode_boolean(b),
+                Value::Number(n) => self.encode_number(n),
+                Value::Text(t) => self.encode_text(t),
+                Value::Array(a) => self.encode_array(a, indent_level),
+                Value::Tuple(t) => self.encode_tuple(t, indent_level),
+                Value::Object(o) => self.encode_object(o, indent_level),
+                Value::Struct(_, s) => self.encode_struct(s, indent_level),
+            }
         }
     }
 }
