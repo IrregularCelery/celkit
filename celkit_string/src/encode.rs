@@ -197,7 +197,7 @@ mod pretty {
             let mut single_line_length = 0;
             let mut can_fit_single_line = true;
 
-            single_line_length += 1; // Opening bracket "["
+            single_line_length += 1; // Opening array character "["
 
             for (i, item) in value.iter().enumerate() {
                 let encoded_item = self.encode_value(item, indent_level + 1)?;
@@ -214,7 +214,7 @@ mod pretty {
             }
 
             if can_fit_single_line {
-                single_line_length += 1; // Closing bracket "]"
+                single_line_length += 1; // Closing array character "]"
 
                 // It's safe to assume this value is a child (nested) element if
                 // the `indent_level` is non-zero. So, we add `1` to the length of the line
@@ -286,7 +286,7 @@ mod pretty {
             let mut single_line_length = 0;
             let mut can_fit_single_line = true;
 
-            single_line_length += 1; // Opening parenthesis "("
+            single_line_length += 1; // Opening tuple character "("
 
             for (i, member) in value.iter().enumerate() {
                 let encoded_member = self.encode_value(member, indent_level + 1)?;
@@ -303,7 +303,7 @@ mod pretty {
             }
 
             if can_fit_single_line {
-                single_line_length += 1; // Closing parenthesis ")"
+                single_line_length += 1; // Closing tuple character ")"
 
                 // It's safe to assume this value is a child (nested) element if
                 // the `indent_level` is non-zero. So, we add `1` to the length of the line
@@ -379,7 +379,7 @@ mod pretty {
             let mut single_line_length = 0;
             let mut can_fit_single_line = true;
 
-            single_line_length += 1; // Opening brace "{"
+            single_line_length += 1; // Opening object character "{"
 
             for (i, entry) in value.iter().enumerate() {
                 let encoded_entry = format!(
@@ -400,7 +400,7 @@ mod pretty {
             }
 
             if can_fit_single_line {
-                single_line_length += 1; // Closing brace "}"
+                single_line_length += 1; // Closing object character "}"
 
                 // It's safe to assume this value is a child (nested) element if
                 // the `indent_level` is non-zero. So, we add `1` to the length of the line
@@ -465,7 +465,87 @@ mod pretty {
             value: &BTreeMap<String, Value>,
             indent_level: usize,
         ) -> Result<String> {
-            todo!()
+            if value.is_empty() {
+                return Ok("@()".to_string());
+            }
+
+            let current_indent = self.indent(indent_level);
+            let next_indent = self.indent(indent_level + 1);
+
+            let mut fields = Vec::new();
+            let mut single_line_length = 0;
+            let mut can_fit_single_line = true;
+
+            single_line_length += 2; // Opening struct characters "@("
+
+            for (i, field) in value.iter().enumerate() {
+                let encoded_field = format!(
+                    "{} = {}",
+                    escape_text(field.0),                          // Field name
+                    self.encode_value(field.1, indent_level + 1)?  // Field value
+                );
+
+                fields.push(encoded_field);
+
+                if can_fit_single_line {
+                    single_line_length += fields[i].len();
+
+                    if i < value.len() - 1 {
+                        single_line_length += 2; // Separator comma and space ", "
+                    }
+                }
+            }
+
+            if can_fit_single_line {
+                single_line_length += 1; // Closing struct character ")"
+
+                // It's safe to assume this value is a child (nested) element if
+                // the `indent_level` is non-zero. So, we add `1` to the length of the line
+                // to account for a possible comma from the parent.
+                let comma_allowance = if indent_level > 0 { 1 } else { 0 };
+
+                // Check if it exceeded the line limit
+                if current_indent.len() + single_line_length + comma_allowance
+                    > self.max_line_length
+                {
+                    can_fit_single_line = false;
+                }
+            }
+
+            if can_fit_single_line {
+                return Ok(format!("@({})", fields.join(", ")));
+            }
+
+            let mut output = String::new();
+            let mut current_line = next_indent.clone();
+            let empty_line_len = next_indent.len();
+
+            output.push_str("@(");
+
+            for (i, encoded_field) in fields.into_iter().enumerate() {
+                let mut formatted_field = encoded_field;
+
+                if i < value.len() - 1 || self.trailing_comma {
+                    formatted_field.push_str(", ");
+                }
+
+                // Each field has its own line
+                output.push_str(&current_line.trim_end());
+                output.push('\n');
+
+                current_line = format!("{}{}", next_indent, formatted_field);
+            }
+
+            // Add the last line if it has content
+            if current_line.len() > empty_line_len {
+                output.push_str(&current_line.trim_end());
+                output.push('\n');
+            }
+
+            output.push_str(&current_indent);
+            output.push(')');
+
+            Ok(output)
         }
 
         fn encode_value(&self, value: &Value, indent_level: usize) -> Result<String> {
