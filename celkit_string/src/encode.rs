@@ -472,49 +472,17 @@ mod pretty {
             let current_indent = self.indent(indent_level);
             let next_indent = self.indent(indent_level + 1);
 
-            let mut fields = Vec::new();
-            let mut single_line_length = 0;
-            let mut can_fit_single_line = true;
-
-            single_line_length += 2; // Opening struct characters "@("
-
-            for (i, field) in value.iter().enumerate() {
-                let encoded_field = format!(
-                    "{} = {}",
-                    escape_text(field.0),                          // Field name
-                    self.encode_value(field.1, indent_level + 1)?  // Field value
-                );
-
-                fields.push(encoded_field);
-
-                if can_fit_single_line {
-                    single_line_length += fields[i].len();
-
-                    if i < value.len() - 1 {
-                        single_line_length += 2; // Separator comma and space ", "
-                    }
-                }
-            }
-
-            if can_fit_single_line {
-                single_line_length += 1; // Closing struct character ")"
-
-                // It's safe to assume this value is a child (nested) element if
-                // the `indent_level` is non-zero. So, we add `1` to the length of the line
-                // to account for a possible comma from the parent.
-                let comma_allowance = if indent_level > 0 { 1 } else { 0 };
-
-                // Check if it exceeded the line limit
-                if current_indent.len() + single_line_length + comma_allowance
-                    > self.max_line_length
-                {
-                    can_fit_single_line = false;
-                }
-            }
-
-            if can_fit_single_line {
-                return Ok(format!("@({})", fields.join(", ")));
-            }
+            let fields: Result<Vec<String>> = value
+                .iter()
+                .map(|field| {
+                    Ok(format!(
+                        "{} = {}",
+                        field.0,                                       // Field name
+                        self.encode_value(field.1, indent_level + 1)?  // Field value
+                    ))
+                })
+                .collect();
+            let fields = fields?;
 
             let mut output = String::new();
             let mut current_line = next_indent.clone();
