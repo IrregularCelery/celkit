@@ -263,7 +263,92 @@ mod pretty {
         }
 
         fn encode_tuple(&self, value: &Vec<Value>, indent_level: usize) -> Result<String> {
-            todo!()
+            if value.is_empty() {
+                return Ok("()".to_string());
+            }
+
+            let current_indent = self.indent(indent_level);
+            let next_indent = self.indent(indent_level + 1);
+
+            let mut members = Vec::new();
+            let mut single_line_length = 0;
+            let mut can_fit_single_line = true;
+
+            single_line_length += 1; // Opening parenthesis "("
+
+            for (i, member) in value.iter().enumerate() {
+                let encoded_member = self.encode_value(member, indent_level + 1)?;
+
+                members.push(encoded_member);
+
+                if can_fit_single_line {
+                    single_line_length += members[i].len();
+
+                    if i < value.len() - 1 {
+                        single_line_length += 2; // Separator comma and space ", "
+                    }
+                }
+            }
+
+            if can_fit_single_line {
+                single_line_length += 1; // Closing parenthesis ")"
+
+                // It's safe to assume this value is a child (nested) element if
+                // the `indent_level` is non-zero. So, we add `1` to the length of the line
+                // to account for a possible comma from the parent.
+                let comma_allowance = if indent_level > 0 { 1 } else { 0 };
+
+                // Check if it exceeded the line limit
+                if current_indent.len() + single_line_length + comma_allowance
+                    > self.max_line_length
+                {
+                    can_fit_single_line = false;
+                }
+            }
+
+            if can_fit_single_line {
+                return Ok(format!("({})", members.join(", ")));
+            }
+
+            let mut output = String::new();
+            let mut current_line = next_indent.clone();
+            let empty_line_len = next_indent.len();
+
+            output.push_str("(\n");
+
+            for (i, encoded_member) in members.into_iter().enumerate() {
+                let mut formatted_member = encoded_member;
+
+                if i < value.len() - 1 || self.trailing_comma {
+                    formatted_member.push_str(", ");
+                }
+
+                // Check if this member would fit in the current line
+                if current_line.len() + formatted_member.len() <= self.max_line_length
+                    || current_line.len() <= empty_line_len
+                {
+                    current_line.push_str(&formatted_member);
+
+                    continue;
+                }
+
+                // Current line has content and would exceed the limit, wrap to next line
+                output.push_str(&current_line.trim_end());
+                output.push('\n');
+
+                current_line = format!("{}{}", next_indent, formatted_member);
+            }
+
+            // Add the last line if it has content
+            if current_line.len() > empty_line_len {
+                output.push_str(&current_line.trim_end());
+                output.push('\n');
+            }
+
+            output.push_str(&current_indent);
+            output.push(')');
+
+            Ok(output)
         }
 
         fn encode_object(
