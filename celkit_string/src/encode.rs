@@ -153,14 +153,6 @@ mod pretty {
             self.encode_value(&self.value, indent_level)
         }
 
-        fn try_single_line_array(&self, value: &Vec<Value>) -> Result<String> {
-            let items: Result<Vec<String>> =
-                value.iter().map(|v| self.encode_value(v, 0)).collect();
-            let items = items?;
-
-            Ok(format!("[{}]", items.join(", ")))
-        }
-
         fn indent(&self, level: usize) -> String {
             " ".repeat(level * self.indent_size)
         }
@@ -189,19 +181,46 @@ mod pretty {
             let current_indent = self.indent(indent_level);
             let next_indent = self.indent(indent_level + 1);
 
-            // TODO: THIS ABSOLUTELY HAS TO BE REPLACED WITH A BETTER APPROACH!!!
-            let single_line = self.try_single_line_array(value)?;
+            let mut items = Vec::new();
+            let mut single_line_length = 0;
+            let mut can_fit_single_line = true;
 
-            if current_indent.len() + single_line.len() <= self.max_line_length {
-                return Ok(single_line);
-            }
-
-            let mut output = "[\n".to_string();
-            let mut current_line = next_indent.clone();
-            let empty_line_len = next_indent.len();
+            single_line_length += 1; // Opening bracket "["
 
             for (i, item) in value.iter().enumerate() {
                 let encoded_item = self.encode_value(item, indent_level + 1)?;
+
+                items.push(encoded_item);
+
+                if can_fit_single_line {
+                    single_line_length += items[i].len();
+
+                    if i < value.len() - 1 {
+                        single_line_length += 2; // Separator comma and space ", "
+                    }
+                }
+            }
+
+            if can_fit_single_line {
+                single_line_length += 1; // Closing bracket "]"
+
+                // Check if it exceeded the line limit
+                if current_indent.len() + single_line_length > self.max_line_length {
+                    can_fit_single_line = false;
+                }
+            }
+
+            if can_fit_single_line {
+                return Ok(format!("[{}]", items.join(", ")));
+            }
+
+            let mut output = String::new();
+            let mut current_line = next_indent.clone();
+            let empty_line_len = next_indent.len();
+
+            output.push_str("[\n");
+
+            for (i, encoded_item) in items.into_iter().enumerate() {
                 let mut formatted_item = encoded_item;
 
                 if i < value.len() - 1 || self.trailing_comma {
