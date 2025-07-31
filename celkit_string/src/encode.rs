@@ -74,7 +74,13 @@ mod mini {
         fn encode_object(&self, value: &BTreeMap<String, Value>) -> Result<String> {
             let entries: Result<Vec<String>> = value
                 .iter()
-                .map(|(k, v)| Ok(format!("\"{}\":{}", escape_text(k), self.encode_value(v)?)))
+                .map(|entry| {
+                    Ok(format!(
+                        "\"{}\":{}",
+                        escape_text(entry.0),        // Entry key
+                        self.encode_value(entry.1)?  // Entry value
+                    ))
+                })
                 .collect();
             let entries = entries?;
 
@@ -84,7 +90,13 @@ mod mini {
         fn encode_struct(&self, value: &BTreeMap<String, Value>) -> Result<String> {
             let fields: Result<Vec<String>> = value
                 .iter()
-                .map(|(k, v)| Ok(format!("{}={}", k, self.encode_value(v)?)))
+                .map(|field| {
+                    Ok(format!(
+                        "{}={}",
+                        field.0,                     // Field name
+                        self.encode_value(field.1)?  // Field value
+                    ))
+                })
                 .collect();
             let fields = fields?;
 
@@ -356,7 +368,96 @@ mod pretty {
             value: &BTreeMap<String, Value>,
             indent_level: usize,
         ) -> Result<String> {
-            todo!()
+            if value.is_empty() {
+                return Ok("{}".to_string());
+            }
+
+            let current_indent = self.indent(indent_level);
+            let next_indent = self.indent(indent_level + 1);
+
+            let mut entries = Vec::new();
+            let mut single_line_length = 0;
+            let mut can_fit_single_line = true;
+
+            single_line_length += 1; // Opening brace "{"
+
+            for (i, entry) in value.iter().enumerate() {
+                let encoded_entry = format!(
+                    "\"{}\": {}",
+                    escape_text(entry.0),                          // Entry key
+                    self.encode_value(entry.1, indent_level + 1)?  // Entry value
+                );
+
+                entries.push(encoded_entry);
+
+                if can_fit_single_line {
+                    single_line_length += entries[i].len();
+
+                    if i < value.len() - 1 {
+                        single_line_length += 2; // Separator comma and space ", "
+                    }
+                }
+            }
+
+            if can_fit_single_line {
+                single_line_length += 1; // Closing brace "}"
+
+                // It's safe to assume this value is a child (nested) element if
+                // the `indent_level` is non-zero. So, we add `1` to the length of the line
+                // to account for a possible comma from the parent.
+                let comma_allowance = if indent_level > 0 { 1 } else { 0 };
+
+                // Check if it exceeded the line limit
+                if current_indent.len() + single_line_length + comma_allowance
+                    > self.max_line_length
+                {
+                    can_fit_single_line = false;
+                }
+            }
+
+            if can_fit_single_line {
+                return Ok(format!("{{{}}}", entries.join(", ")));
+            }
+
+            let mut output = String::new();
+            let mut current_line = next_indent.clone();
+            let empty_line_len = next_indent.len();
+
+            output.push_str("{\n");
+
+            for (i, encoded_entry) in entries.into_iter().enumerate() {
+                let mut formatted_entry = encoded_entry;
+
+                if i < value.len() - 1 || self.trailing_comma {
+                    formatted_entry.push_str(", ");
+                }
+
+                // Check if this entry would fit in the current line
+                if current_line.len() + formatted_entry.len() <= self.max_line_length
+                    || current_line.len() <= empty_line_len
+                {
+                    current_line.push_str(&formatted_entry);
+
+                    continue;
+                }
+
+                // Current line has content and would exceed the limit, wrap to next line
+                output.push_str(&current_line.trim_end());
+                output.push('\n');
+
+                current_line = format!("{}{}", next_indent, formatted_entry);
+            }
+
+            // Add the last line if it has content
+            if current_line.len() > empty_line_len {
+                output.push_str(&current_line.trim_end());
+                output.push('\n');
+            }
+
+            output.push_str(&current_indent);
+            output.push('}');
+
+            Ok(output)
         }
 
         fn encode_struct(
