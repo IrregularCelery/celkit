@@ -204,8 +204,15 @@ mod pretty {
             if can_fit_single_line {
                 single_line_length += 1; // Closing bracket "]"
 
+                // It's safe to assume this value is a child (nested) element if
+                // the `indent_level` is non-zero. So, we add `1` to the length of the line
+                // to account for a possible comma from the parent.
+                let comma_allowance = if indent_level > 0 { 1 } else { 0 };
+
                 // Check if it exceeded the line limit
-                if current_indent.len() + single_line_length > self.max_line_length {
+                if current_indent.len() + single_line_length + comma_allowance
+                    > self.max_line_length
+                {
                     can_fit_single_line = false;
                 }
             }
