@@ -125,16 +125,16 @@ mod pretty {
     use celkit_core::internal::{Number, Result, Value};
 
     pub struct Encoder {
-        value: Value,
+        input: Value,
         indent_size: usize,
         max_line_length: usize,
         trailing_comma: bool,
     }
 
     impl Encoder {
-        pub fn new(value: Value) -> Self {
+        pub fn new(input: Value) -> Self {
             Self {
-                value,
+                input,
                 indent_size: 2,
                 max_line_length: 100,
                 trailing_comma: true,
@@ -162,7 +162,7 @@ mod pretty {
         pub fn encode(self) -> Result<String> {
             let depth = 0;
 
-            self.encode_value(&self.value, depth)
+            self.encode_value(&self.input, depth)
         }
 
         fn indent(&self, level: usize) -> String {
