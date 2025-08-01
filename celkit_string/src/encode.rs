@@ -29,16 +29,16 @@ mod mini {
     use celkit_core::internal::{Number, Result, Value};
 
     pub struct Encoder {
-        value: Value,
+        input: Value,
     }
 
     impl Encoder {
-        pub fn new(value: Value) -> Self {
-            Self { value }
+        pub fn new(input: Value) -> Self {
+            Self { input }
         }
 
         pub fn encode(self) -> Result<String> {
-            self.encode_value(&self.value)
+            self.encode_value(&self.input)
         }
 
         fn encode_null(&self) -> Result<String> {
@@ -160,9 +160,9 @@ mod pretty {
         }
 
         pub fn encode(self) -> Result<String> {
-            let indent_level = 0;
+            let depth = 0;
 
-            self.encode_value(&self.value, indent_level)
+            self.encode_value(&self.value, depth)
         }
 
         fn indent(&self, level: usize) -> String {
@@ -185,13 +185,13 @@ mod pretty {
             Ok(format!("\"{}\"", escape_text(value)))
         }
 
-        fn encode_array(&self, value: &Vec<Value>, indent_level: usize) -> Result<String> {
+        fn encode_array(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
                 return Ok("[]".to_string());
             }
 
-            let current_indent = self.indent(indent_level);
-            let next_indent = self.indent(indent_level + 1);
+            let current_indent = self.indent(depth);
+            let next_indent = self.indent(depth + 1);
 
             let mut items = Vec::new();
             let mut single_line_length = 0;
@@ -200,7 +200,7 @@ mod pretty {
             single_line_length += 1; // Opening array character "["
 
             for (i, item) in value.iter().enumerate() {
-                let encoded_item = self.encode_value(item, indent_level + 1)?;
+                let encoded_item = self.encode_value(item, depth + 1)?;
 
                 items.push(encoded_item);
 
@@ -217,9 +217,9 @@ mod pretty {
                 single_line_length += 1; // Closing array character "]"
 
                 // It's safe to assume this value is a child (nested) element if
-                // the `indent_level` is non-zero. So, we add `1` to the length of the line
+                // the `depth` is non-zero. So, we add `1` to the length of the line
                 // to account for a possible comma from the parent.
-                let comma_allowance = if indent_level > 0 { 1 } else { 0 };
+                let comma_allowance = if depth > 0 { 1 } else { 0 };
 
                 // Check if it exceeded the line limit
                 if current_indent.len() + single_line_length + comma_allowance
@@ -274,13 +274,13 @@ mod pretty {
             Ok(output)
         }
 
-        fn encode_tuple(&self, value: &Vec<Value>, indent_level: usize) -> Result<String> {
+        fn encode_tuple(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
                 return Ok("()".to_string());
             }
 
-            let current_indent = self.indent(indent_level);
-            let next_indent = self.indent(indent_level + 1);
+            let current_indent = self.indent(depth);
+            let next_indent = self.indent(depth + 1);
 
             let mut members = Vec::new();
             let mut single_line_length = 0;
@@ -289,7 +289,7 @@ mod pretty {
             single_line_length += 1; // Opening tuple character "("
 
             for (i, member) in value.iter().enumerate() {
-                let encoded_member = self.encode_value(member, indent_level + 1)?;
+                let encoded_member = self.encode_value(member, depth + 1)?;
 
                 members.push(encoded_member);
 
@@ -306,9 +306,9 @@ mod pretty {
                 single_line_length += 1; // Closing tuple character ")"
 
                 // It's safe to assume this value is a child (nested) element if
-                // the `indent_level` is non-zero. So, we add `1` to the length of the line
+                // the `depth` is non-zero. So, we add `1` to the length of the line
                 // to account for a possible comma from the parent.
-                let comma_allowance = if indent_level > 0 { 1 } else { 0 };
+                let comma_allowance = if depth > 0 { 1 } else { 0 };
 
                 // Check if it exceeded the line limit
                 if current_indent.len() + single_line_length + comma_allowance
@@ -363,17 +363,13 @@ mod pretty {
             Ok(output)
         }
 
-        fn encode_object(
-            &self,
-            value: &BTreeMap<String, Value>,
-            indent_level: usize,
-        ) -> Result<String> {
+        fn encode_object(&self, value: &BTreeMap<String, Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
                 return Ok("{}".to_string());
             }
 
-            let current_indent = self.indent(indent_level);
-            let next_indent = self.indent(indent_level + 1);
+            let current_indent = self.indent(depth);
+            let next_indent = self.indent(depth + 1);
 
             let mut entries = Vec::new();
             let mut single_line_length = 0;
@@ -384,8 +380,8 @@ mod pretty {
             for (i, entry) in value.iter().enumerate() {
                 let encoded_entry = format!(
                     "\"{}\": {}",
-                    escape_text(entry.0),                          // Entry key
-                    self.encode_value(entry.1, indent_level + 1)?  // Entry value
+                    escape_text(entry.0),                   // Entry key
+                    self.encode_value(entry.1, depth + 1)?  // Entry value
                 );
 
                 entries.push(encoded_entry);
@@ -403,9 +399,9 @@ mod pretty {
                 single_line_length += 1; // Closing object character "}"
 
                 // It's safe to assume this value is a child (nested) element if
-                // the `indent_level` is non-zero. So, we add `1` to the length of the line
+                // the `depth` is non-zero. So, we add `1` to the length of the line
                 // to account for a possible comma from the parent.
-                let comma_allowance = if indent_level > 0 { 1 } else { 0 };
+                let comma_allowance = if depth > 0 { 1 } else { 0 };
 
                 // Check if it exceeded the line limit
                 if current_indent.len() + single_line_length + comma_allowance
@@ -460,25 +456,21 @@ mod pretty {
             Ok(output)
         }
 
-        fn encode_struct(
-            &self,
-            value: &BTreeMap<String, Value>,
-            indent_level: usize,
-        ) -> Result<String> {
+        fn encode_struct(&self, value: &BTreeMap<String, Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
                 return Ok("@()".to_string());
             }
 
-            let current_indent = self.indent(indent_level);
-            let next_indent = self.indent(indent_level + 1);
+            let current_indent = self.indent(depth);
+            let next_indent = self.indent(depth + 1);
 
             let fields: Result<Vec<String>> = value
                 .iter()
                 .map(|field| {
                     Ok(format!(
                         "{} = {}",
-                        field.0,                                       // Field name
-                        self.encode_value(field.1, indent_level + 1)?  // Field value
+                        field.0,                                // Field name
+                        self.encode_value(field.1, depth + 1)?  // Field value
                     ))
                 })
                 .collect();
@@ -516,16 +508,16 @@ mod pretty {
             Ok(output)
         }
 
-        fn encode_value(&self, value: &Value, indent_level: usize) -> Result<String> {
+        fn encode_value(&self, value: &Value, depth: usize) -> Result<String> {
             match value {
                 Value::Null => self.encode_null(),
                 Value::Boolean(b) => self.encode_boolean(b),
                 Value::Number(n) => self.encode_number(n),
                 Value::Text(t) => self.encode_text(t),
-                Value::Array(a) => self.encode_array(a, indent_level),
-                Value::Tuple(t) => self.encode_tuple(t, indent_level),
-                Value::Object(o) => self.encode_object(o, indent_level),
-                Value::Struct(_, s) => self.encode_struct(s, indent_level),
+                Value::Array(a) => self.encode_array(a, depth),
+                Value::Tuple(t) => self.encode_tuple(t, depth),
+                Value::Object(o) => self.encode_object(o, depth),
+                Value::Struct(_, s) => self.encode_struct(s, depth),
             }
         }
     }
