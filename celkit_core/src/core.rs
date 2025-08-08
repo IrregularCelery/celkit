@@ -1,5 +1,4 @@
 use crate::internal::sys::*;
-use core::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
@@ -17,21 +16,21 @@ pub enum Number {
     F64(f64),
 }
 
-impl ToString for Number {
-    fn to_string(&self) -> String {
+impl core::fmt::Display for Number {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Number::U8(number) => number.to_string(),
-            Number::I8(number) => number.to_string(),
-            Number::U16(number) => number.to_string(),
-            Number::I16(number) => number.to_string(),
-            Number::U32(number) => number.to_string(),
-            Number::I32(number) => number.to_string(),
-            Number::U64(number) => number.to_string(),
-            Number::I64(number) => number.to_string(),
-            Number::U128(number) => number.to_string(),
-            Number::I128(number) => number.to_string(),
-            Number::F32(number) => number.to_string(),
-            Number::F64(number) => number.to_string(),
+            Number::U8(n) => core::write!(f, "{}", n),
+            Number::I8(n) => core::write!(f, "{}", n),
+            Number::U16(n) => core::write!(f, "{}", n),
+            Number::I16(n) => core::write!(f, "{}", n),
+            Number::U32(n) => core::write!(f, "{}", n),
+            Number::I32(n) => core::write!(f, "{}", n),
+            Number::U64(n) => core::write!(f, "{}", n),
+            Number::I64(n) => core::write!(f, "{}", n),
+            Number::U128(n) => core::write!(f, "{}", n),
+            Number::I128(n) => core::write!(f, "{}", n),
+            Number::F32(n) => core::write!(f, "{}", n),
+            Number::F64(n) => core::write!(f, "{}", n),
         }
     }
 }
@@ -90,8 +89,8 @@ impl Error {
     }
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match (self.line, self.column) {
             (Some(line), Some(column)) => {
                 write!(
