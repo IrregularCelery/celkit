@@ -5,16 +5,27 @@ fn escape_text(input: &str) -> String {
 
     for c in input.chars() {
         match c {
+            // Standard escape sequences
+            '\x00' => output.push_str("\\0"), // Null character           \0
+            '\x07' => output.push_str("\\a"), // Alert (Beep, Bell)       \a
             '\x08' => output.push_str("\\b"), // Backspace                \b
+            '\x1B' => output.push_str("\\e"), // Escape character         \e
             '\x0C' => output.push_str("\\f"), // Formfeed Page Break      \f
-            '\n' => output.push_str("\\n"),   // Newline (Line Feed)      \n
-            '\r' => output.push_str("\\r"),   // Carriage Return          \r
-            '\t' => output.push_str("\\t"),   // Horizontal Tab           \t
-            '\\' => output.push_str("\\\\"),  // Backslash                \\
-            '"' => output.push_str("\\\""),   // Double quotation mark    \"
+            '\x0A' => output.push_str("\\n"), // Newline (Line Feed)      \n
+            '\x0D' => output.push_str("\\r"), // Carriage Return          \r
+            '\x09' => output.push_str("\\t"), // Horizontal Tab           \t
+            '\x0B' => output.push_str("\\v"), // Vertical Tab             \v
+
+            // `Cel` Format-specific characters
+            '\x5C' => output.push_str("\\\\"), // Backslash                \\
+            '\x22' => output.push_str("\\\""), // Double quotation mark    \"
+
+            // Control characters
             c if c.is_control() => {
-                output.push_str(&format!("\\u{:04x}", c as u32));
+                output.push_str(&format!("\\u{:04X}", c as u32));
             }
+
+            // Everything else passes through
             c => output.push(c),
         }
     }
@@ -526,7 +537,7 @@ mod pretty {
 pub fn to_string<T: ?Sized + celkit_core::Serialize>(
     value: &T,
 ) -> celkit_core::internal::Result<String> {
-    let serialized = value.serialize()?;
+    let serialized = T::serialize(&value)?;
 
     pretty::Encoder::new(serialized).encode()
 }
