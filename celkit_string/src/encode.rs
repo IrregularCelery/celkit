@@ -123,7 +123,7 @@ mod mini {
                 Value::Array(a) => self.encode_array(a),
                 Value::Tuple(t) => self.encode_tuple(t),
                 Value::Object(o) => self.encode_object(o),
-                Value::Struct(_, s) => self.encode_struct(s),
+                Value::Struct(s) => self.encode_struct(s),
             }
         }
     }
@@ -528,7 +528,7 @@ mod pretty {
                 Value::Array(a) => self.encode_array(a, depth),
                 Value::Tuple(t) => self.encode_tuple(t, depth),
                 Value::Object(o) => self.encode_object(o, depth),
-                Value::Struct(_, s) => self.encode_struct(s, depth),
+                Value::Struct(s) => self.encode_struct(s, depth),
             }
         }
     }
