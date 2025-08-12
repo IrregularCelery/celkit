@@ -35,6 +35,7 @@ fn escape_text(input: &str) -> String {
 
 /// Minified encoding (single-line)
 mod mini {
+    use crate::common::Token;
     use crate::encode::escape_text;
     use celkit_core::internal::sys::*;
     use celkit_core::internal::{Number, Result, Value};
@@ -53,7 +54,7 @@ mod mini {
         }
 
         fn encode_null(&self) -> Result<String> {
-            Ok("null".to_string())
+            Ok(Token::Null.to_string())
         }
 
         fn encode_boolean(&self, value: &bool) -> Result<String> {
@@ -72,14 +73,24 @@ mod mini {
             let items: Result<Vec<String>> = value.iter().map(|v| self.encode_value(v)).collect();
             let items = items?;
 
-            Ok(format!("[{}]", items.join(",")))
+            Ok(format!(
+                "{}{}{}",
+                Token::OpenBracket,
+                items.join(&Token::Comma.to_string()),
+                Token::CloseBracket
+            ))
         }
 
         fn encode_tuple(&self, value: &Vec<Value>) -> Result<String> {
             let members: Result<Vec<String>> = value.iter().map(|v| self.encode_value(v)).collect();
             let members = members?;
 
-            Ok(format!("({})", members.join(",")))
+            Ok(format!(
+                "{}{}{}",
+                Token::OpenParenthesis,
+                members.join(&Token::Comma.to_string()),
+                Token::CloseParenthesis
+            ))
         }
 
         fn encode_object(&self, value: &BTreeMap<String, Value>) -> Result<String> {
@@ -87,15 +98,21 @@ mod mini {
                 .iter()
                 .map(|entry| {
                     Ok(format!(
-                        "\"{}\":{}",
-                        escape_text(entry.0),        // Entry key
-                        self.encode_value(entry.1)?  // Entry value
+                        "\"{}\"{}{}",
+                        escape_text(entry.0), // Entry key
+                        Token::Colon,
+                        self.encode_value(entry.1)? // Entry value
                     ))
                 })
                 .collect();
             let entries = entries?;
 
-            Ok(format!("{{{}}}", entries.join(",")))
+            Ok(format!(
+                "{}{}{}",
+                Token::OpenBrace,
+                entries.join(&Token::Comma.to_string()),
+                Token::CloseBrace
+            ))
         }
 
         fn encode_struct(&self, value: &BTreeMap<String, Value>) -> Result<String> {
@@ -103,15 +120,22 @@ mod mini {
                 .iter()
                 .map(|field| {
                     Ok(format!(
-                        "{}={}",
-                        field.0,                     // Field name
-                        self.encode_value(field.1)?  // Field value
+                        "{}{}{}",
+                        field.0, // Field name
+                        Token::Equals,
+                        self.encode_value(field.1)? // Field value
                     ))
                 })
                 .collect();
             let fields = fields?;
 
-            Ok(format!("@({})", fields.join(",")))
+            Ok(format!(
+                "{}{}{}{}",
+                Token::At,
+                Token::OpenParenthesis,
+                fields.join(&Token::Comma.to_string()),
+                Token::CloseParenthesis
+            ))
         }
 
         fn encode_value(&self, value: &Value) -> Result<String> {
@@ -131,6 +155,7 @@ mod mini {
 
 /// Prettified encoding (multi-line)
 mod pretty {
+    use crate::common::Token;
     use crate::encode::escape_text;
     use celkit_core::internal::sys::*;
     use celkit_core::internal::{Number, Result, Value};
@@ -181,7 +206,7 @@ mod pretty {
         }
 
         fn encode_null(&self) -> Result<String> {
-            Ok("null".to_string())
+            Ok(Token::Null.to_string())
         }
 
         fn encode_boolean(&self, value: &bool) -> Result<String> {
@@ -198,7 +223,7 @@ mod pretty {
 
         fn encode_array(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok("[]".to_string());
+                return Ok(format!("{}{}", Token::OpenBracket, Token::CloseBracket));
             }
 
             let current_indent = self.indent(depth);
@@ -208,7 +233,7 @@ mod pretty {
             let mut single_line_length = 0;
             let mut can_fit_single_line = true;
 
-            single_line_length += 1; // Opening array character "["
+            single_line_length += 1; // OpenBracket
 
             for (i, item) in value.iter().enumerate() {
                 let encoded_item = self.encode_value(item, depth + 1)?;
@@ -219,13 +244,13 @@ mod pretty {
                     single_line_length += items[i].len();
 
                     if i < value.len() - 1 {
-                        single_line_length += 2; // Separator comma and space ", "
+                        single_line_length += 2; // Comma and space
                     }
                 }
             }
 
             if can_fit_single_line {
-                single_line_length += 1; // Closing array character "]"
+                single_line_length += 1; // CloseBracket
 
                 // It's safe to assume this value is a child (nested) element if
                 // the `depth` is non-zero. So, we add `1` to the length of the line
@@ -241,20 +266,25 @@ mod pretty {
             }
 
             if can_fit_single_line {
-                return Ok(format!("[{}]", items.join(", ")));
+                return Ok(format!(
+                    "{}{}{}",
+                    Token::OpenBracket,
+                    items.join(&format!("{} ", Token::Comma)),
+                    Token::CloseBracket
+                ));
             }
 
             let mut output = String::new();
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str("[\n");
+            output.push_str(&format!("{}\n", Token::OpenBracket));
 
             for (i, encoded_item) in items.into_iter().enumerate() {
                 let mut formatted_item = encoded_item;
 
                 if i < value.len() - 1 || self.trailing_comma {
-                    formatted_item.push_str(", ");
+                    formatted_item.push_str(&format!("{} ", Token::Comma));
                 }
 
                 // Check if this item would fit in the current line
@@ -280,14 +310,18 @@ mod pretty {
             }
 
             output.push_str(&current_indent);
-            output.push(']');
+            output.push_str(&Token::CloseBracket.to_string());
 
             Ok(output)
         }
 
         fn encode_tuple(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok("()".to_string());
+                return Ok(format!(
+                    "{}{}",
+                    Token::OpenParenthesis,
+                    Token::CloseParenthesis
+                ));
             }
 
             let current_indent = self.indent(depth);
@@ -297,7 +331,7 @@ mod pretty {
             let mut single_line_length = 0;
             let mut can_fit_single_line = true;
 
-            single_line_length += 1; // Opening tuple character "("
+            single_line_length += 1; // OpenParenthesis
 
             for (i, member) in value.iter().enumerate() {
                 let encoded_member = self.encode_value(member, depth + 1)?;
@@ -308,13 +342,13 @@ mod pretty {
                     single_line_length += members[i].len();
 
                     if i < value.len() - 1 {
-                        single_line_length += 2; // Separator comma and space ", "
+                        single_line_length += 2; // Comma and space
                     }
                 }
             }
 
             if can_fit_single_line {
-                single_line_length += 1; // Closing tuple character ")"
+                single_line_length += 1; // CloseParenthesis
 
                 // It's safe to assume this value is a child (nested) element if
                 // the `depth` is non-zero. So, we add `1` to the length of the line
@@ -330,20 +364,25 @@ mod pretty {
             }
 
             if can_fit_single_line {
-                return Ok(format!("({})", members.join(", ")));
+                return Ok(format!(
+                    "{}{}{}",
+                    Token::OpenParenthesis,
+                    members.join(&format!("{} ", Token::Comma)),
+                    Token::CloseParenthesis
+                ));
             }
 
             let mut output = String::new();
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str("(\n");
+            output.push_str(&format!("{}\n", Token::OpenParenthesis));
 
             for (i, encoded_member) in members.into_iter().enumerate() {
                 let mut formatted_member = encoded_member;
 
                 if i < value.len() - 1 || self.trailing_comma {
-                    formatted_member.push_str(", ");
+                    formatted_member.push_str(&format!("{} ", Token::Comma));
                 }
 
                 // Check if this member would fit in the current line
@@ -369,14 +408,14 @@ mod pretty {
             }
 
             output.push_str(&current_indent);
-            output.push(')');
+            output.push_str(&Token::CloseParenthesis.to_string());
 
             Ok(output)
         }
 
         fn encode_object(&self, value: &BTreeMap<String, Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok("{}".to_string());
+                return Ok(format!("{}{}", Token::OpenBrace, Token::CloseBrace));
             }
 
             let current_indent = self.indent(depth);
@@ -386,13 +425,14 @@ mod pretty {
             let mut single_line_length = 0;
             let mut can_fit_single_line = true;
 
-            single_line_length += 1; // Opening object character "{"
+            single_line_length += 1; // OpenBrace
 
             for (i, entry) in value.iter().enumerate() {
                 let encoded_entry = format!(
-                    "\"{}\": {}",
-                    escape_text(entry.0),                   // Entry key
-                    self.encode_value(entry.1, depth + 1)?  // Entry value
+                    "\"{}\"{} {}",
+                    escape_text(entry.0), // Entry key
+                    Token::Colon,
+                    self.encode_value(entry.1, depth + 1)? // Entry value
                 );
 
                 entries.push(encoded_entry);
@@ -401,13 +441,13 @@ mod pretty {
                     single_line_length += entries[i].len();
 
                     if i < value.len() - 1 {
-                        single_line_length += 2; // Separator comma and space ", "
+                        single_line_length += 2; // Comma and space
                     }
                 }
             }
 
             if can_fit_single_line {
-                single_line_length += 1; // Closing object character "}"
+                single_line_length += 1; // CloseBrace
 
                 // It's safe to assume this value is a child (nested) element if
                 // the `depth` is non-zero. So, we add `1` to the length of the line
@@ -423,20 +463,25 @@ mod pretty {
             }
 
             if can_fit_single_line {
-                return Ok(format!("{{{}}}", entries.join(", ")));
+                return Ok(format!(
+                    "{}{}{}",
+                    Token::OpenBrace,
+                    entries.join(&format!("{} ", Token::Comma)),
+                    Token::CloseBrace
+                ));
             }
 
             let mut output = String::new();
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str("{\n");
+            output.push_str(&format!("{}\n", Token::OpenBrace));
 
             for (i, encoded_entry) in entries.into_iter().enumerate() {
                 let mut formatted_entry = encoded_entry;
 
                 if i < value.len() - 1 || self.trailing_comma {
-                    formatted_entry.push_str(", ");
+                    formatted_entry.push_str(&format!("{} ", Token::Comma));
                 }
 
                 // Check if this entry would fit in the current line
@@ -462,14 +507,19 @@ mod pretty {
             }
 
             output.push_str(&current_indent);
-            output.push('}');
+            output.push_str(&Token::CloseBrace.to_string());
 
             Ok(output)
         }
 
         fn encode_struct(&self, value: &BTreeMap<String, Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok("@()".to_string());
+                return Ok(format!(
+                    "{}{}{}",
+                    Token::At,
+                    Token::OpenParenthesis,
+                    Token::CloseParenthesis
+                ));
             }
 
             let current_indent = self.indent(depth);
@@ -479,9 +529,10 @@ mod pretty {
                 .iter()
                 .map(|field| {
                     Ok(format!(
-                        "{} = {}",
-                        field.0,                                // Field name
-                        self.encode_value(field.1, depth + 1)?  // Field value
+                        "{} {} {}",
+                        field.0, // Field name
+                        Token::Equals,
+                        self.encode_value(field.1, depth + 1)? // Field value
                     ))
                 })
                 .collect();
@@ -491,13 +542,13 @@ mod pretty {
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str("@(");
+            output.push_str(&format!("{}{}", Token::At, Token::OpenParenthesis));
 
             for (i, encoded_field) in fields.into_iter().enumerate() {
                 let mut formatted_field = encoded_field;
 
                 if i < value.len() - 1 || self.trailing_comma {
-                    formatted_field.push_str(", ");
+                    formatted_field.push_str(&format!("{} ", Token::Comma));
                 }
 
                 // Each field has its own line
@@ -514,7 +565,7 @@ mod pretty {
             }
 
             output.push_str(&current_indent);
-            output.push(')');
+            output.push_str(&Token::CloseParenthesis.to_string());
 
             Ok(output)
         }
