@@ -44,7 +44,7 @@ pub enum Value {
     Array(Vec<Value>),
     Tuple(Vec<Value>),
     Object(BTreeMap<String, Value>),
-    Struct(String, BTreeMap<String, Value>),
+    Struct(BTreeMap<String, Value>),
 }
 
 #[derive(Debug)]
@@ -55,6 +55,7 @@ pub struct Error {
     pub column: Option<usize>,
 }
 
+// TODO: Probably better to move this into `decode` module and have a separate one for `encode`
 impl Error {
     pub fn new(message: impl Into<String>) -> Self {
         Self {
@@ -62,15 +63,6 @@ impl Error {
             context: None,
             line: None,
             column: None,
-        }
-    }
-
-    pub fn with_position(message: impl Into<String>, line: usize, column: usize) -> Self {
-        Self {
-            message: message.into(),
-            context: None,
-            line: Some(line),
-            column: Some(column),
         }
     }
 
