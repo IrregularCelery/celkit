@@ -370,6 +370,37 @@ impl_for_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 impl_for_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
 impl_for_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
+// ------------------------------ BTreeMap -------------------------------- //
+
+impl<K: Into<String> + Clone, V: Serialize> Serialize for BTreeMap<K, V> {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = BTreeMap::new();
+
+        for (key, value) in self {
+            values.insert(key.clone().into(), value.serialize()?);
+        }
+
+        Ok(Value::Object(values))
+    }
+}
+
+impl<V: Deserialize> Deserialize for BTreeMap<String, V> {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Object(object) => {
+                let mut map = BTreeMap::new();
+
+                for (key, value) in object {
+                    map.insert(key, V::deserialize(value)?);
+                }
+
+                Ok(map)
+            }
+            _ => Err(Error::new("Expected object")),
+        }
+    }
+}
+
 // ------------------------------- HashMap -------------------------------- //
 
 #[cfg(feature = "std")]
