@@ -21,70 +21,70 @@ macro_rules! impl_for_integer {
                         match number {
                             Number::U8(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert u8 number {} to {}",
+                                    "Cannot convert u8 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I8(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert i8 number {} to {}",
+                                    "Cannot convert i8 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::U16(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert u16 number {} to {}",
+                                    "Cannot convert u16 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I16(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert i16 number {} to {}",
+                                    "Cannot convert i16 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::U32(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert u32 number {} to {}",
+                                    "Cannot convert u32 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I32(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert i32 number {} to {}",
+                                    "Cannot convert i32 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::U64(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert u64 number {} to {}",
+                                    "Cannot convert u64 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I64(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert i64 number {} to {}",
+                                    "Cannot convert i64 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::U128(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert u128 number {} to {}",
+                                    "Cannot convert u128 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I128(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot covert i128 number {} to {}",
+                                    "Cannot convert i128 number {} to {}",
                                     n,
                                     stringify!($type)
                                 ))
@@ -94,7 +94,7 @@ macro_rules! impl_for_integer {
 
                                 if as_int as f32 != n {
                                     return Err(Error::new(format!(
-                                        "Cannot covert f32 number {} to {} \
+                                        "Cannot convert f32 number {} to {} \
                                          without loss of precision",
                                         n,
                                         stringify!($type)
@@ -103,7 +103,7 @@ macro_rules! impl_for_integer {
 
                                 <$type>::try_from(as_int).map_err(|_| {
                                     Error::new(format!(
-                                        "Cannot covert f32 number {} to {}",
+                                        "Cannot convert f32 number {} to {}",
                                         n,
                                         stringify!($type)
                                     ))
@@ -114,7 +114,7 @@ macro_rules! impl_for_integer {
 
                                 if as_int as f64 != n {
                                     return Err(Error::new(format!(
-                                        "Cannot covert f64 number {} to {} \
+                                        "Cannot convert f64 number {} to {} \
                                          without loss of precision",
                                         n,
                                         stringify!($type)
@@ -123,7 +123,7 @@ macro_rules! impl_for_integer {
 
                                 <$type>::try_from(as_int).map_err(|_| {
                                     Error::new(format!(
-                                        "Cannot covert f64 number {} to {}",
+                                        "Cannot convert f64 number {} to {}",
                                         n,
                                         stringify!($type)
                                     ))
