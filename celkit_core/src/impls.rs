@@ -425,23 +425,23 @@ macro_rules! impl_for_struct {
 
         impl $crate::Serialize for $name {
             fn serialize(&self) -> $crate::internal::Result<$crate::internal::Value> {
-                let mut map = $crate::internal::sys::BTreeMap::new();
+                let mut fields = $crate::internal::sys::BTreeMap::new();
 
                 $(
-                    map.insert(
+                    fields.insert(
                         stringify!($field_name).to_string(),
                         self.$field_name.serialize()?
                     );
                 )*
 
-                Ok($crate::internal::Value::Struct(stringify!($name).to_string(), map))
+                Ok($crate::internal::Value::Struct(fields))
             }
         }
 
         impl $crate::Deserialize for $name {
             fn deserialize(value: $crate::internal::Value) -> $crate::internal::Result<Self> {
                 match value {
-                    $crate::internal::Value::Struct(_, fields) => {
+                    $crate::internal::Value::Struct(fields) => {
                         $(
                             let $field_name =
                                 match fields.get(stringify!($field_name)) {
