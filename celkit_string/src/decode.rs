@@ -299,7 +299,7 @@ impl Decoder {
         match self.current_char {
             None => Ok(Token::Eof),
             Some('@') => self.find_char(Token::StructMarker),
-            Some('[') => self.find_char(Token::OpenBracket),
+            Some('[') => self.find_char(Token::ArrayOpen),
             Some(']') => self.find_char(Token::CloseBracket),
             Some('(') => self.find_char(Token::OpenParenthesis),
             Some(')') => self.find_char(Token::CloseParenthesis),
@@ -569,7 +569,7 @@ impl Decoder {
 
         match token {
             Token::StructMarker => self.decode_struct(),
-            Token::OpenBracket => self.decode_array(),
+            Token::ArrayOpen => self.decode_array(),
             Token::CloseBracket => Err(self.error(format!(
                 "Unexpected '{}' - found closing bracket without matching opening bracket",
                 Token::CloseBracket

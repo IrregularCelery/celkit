@@ -75,7 +75,7 @@ mod mini {
 
             Ok(format!(
                 "{}{}{}",
-                Token::OpenBracket,
+                Token::ArrayOpen,
                 items.join(&Token::Comma.to_string()),
                 Token::CloseBracket
             ))
@@ -223,7 +223,7 @@ mod pretty {
 
         fn encode_array(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok(format!("{}{}", Token::OpenBracket, Token::CloseBracket));
+                return Ok(format!("{}{}", Token::ArrayOpen, Token::CloseBracket));
             }
 
             let current_indent = self.indent(depth);
@@ -233,7 +233,7 @@ mod pretty {
             let mut single_line_length = 0;
             let mut can_fit_single_line = true;
 
-            single_line_length += 1; // OpenBracket
+            single_line_length += 1; // ArrayOpen
 
             for (i, item) in value.iter().enumerate() {
                 let encoded_item = self.encode_value(item, depth + 1)?;
@@ -268,7 +268,7 @@ mod pretty {
             if can_fit_single_line {
                 return Ok(format!(
                     "{}{}{}",
-                    Token::OpenBracket,
+                    Token::ArrayOpen,
                     items.join(&format!("{} ", Token::Comma)),
                     Token::CloseBracket
                 ));
@@ -278,7 +278,7 @@ mod pretty {
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str(&format!("{}\n", Token::OpenBracket));
+            output.push_str(&format!("{}\n", Token::ArrayOpen));
 
             for (i, encoded_item) in items.into_iter().enumerate() {
                 let mut formatted_item = encoded_item;
