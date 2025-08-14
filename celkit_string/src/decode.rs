@@ -303,7 +303,7 @@ impl Decoder {
             Some(']') => self.find_char(Token::ArrayClose),
             Some('(') => self.find_char(Token::TupleOpen),
             Some(')') => self.find_char(Token::TupleClose),
-            Some('{') => self.find_char(Token::OpenBrace),
+            Some('{') => self.find_char(Token::ObjectOpen),
             Some('}') => self.find_char(Token::CloseBrace),
             Some('=') => self.find_char(Token::Equals),
             Some(':') => self.find_char(Token::Colon),
@@ -579,7 +579,7 @@ impl Decoder {
                 "Unexpected '{}' - found closing parenthesis without matching opening parenthesis",
                 Token::TupleClose,
             ))),
-            Token::OpenBrace => self.decode_object(),
+            Token::ObjectOpen => self.decode_object(),
             Token::CloseBrace => Err(self.error(format!(
                 "Unexpected '{}' - found closing brace without matching opening brace",
                 Token::CloseBrace

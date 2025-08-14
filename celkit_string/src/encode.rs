@@ -109,7 +109,7 @@ mod mini {
 
             Ok(format!(
                 "{}{}{}",
-                Token::OpenBrace,
+                Token::ObjectOpen,
                 entries.join(&Token::Comma.to_string()),
                 Token::CloseBrace
             ))
@@ -411,7 +411,7 @@ mod pretty {
 
         fn encode_object(&self, value: &BTreeMap<String, Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok(format!("{}{}", Token::OpenBrace, Token::CloseBrace));
+                return Ok(format!("{}{}", Token::ObjectOpen, Token::CloseBrace));
             }
 
             let current_indent = self.indent(depth);
@@ -421,7 +421,7 @@ mod pretty {
             let mut single_line_length = 0;
             let mut can_fit_single_line = true;
 
-            single_line_length += 1; // OpenBrace
+            single_line_length += 1; // ObjectOpen
 
             for (i, entry) in value.iter().enumerate() {
                 let encoded_entry = format!(
@@ -461,7 +461,7 @@ mod pretty {
             if can_fit_single_line {
                 return Ok(format!(
                     "{}{}{}",
-                    Token::OpenBrace,
+                    Token::ObjectOpen,
                     entries.join(&format!("{} ", Token::Comma)),
                     Token::CloseBrace
                 ));
@@ -471,7 +471,7 @@ mod pretty {
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str(&format!("{}\n", Token::OpenBrace));
+            output.push_str(&format!("{}\n", Token::ObjectOpen));
 
             for (i, encoded_entry) in entries.into_iter().enumerate() {
                 let mut formatted_entry = encoded_entry;
