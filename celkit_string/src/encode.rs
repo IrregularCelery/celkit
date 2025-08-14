@@ -87,7 +87,7 @@ mod mini {
 
             Ok(format!(
                 "{}{}{}",
-                Token::OpenParenthesis,
+                Token::TupleOpen,
                 members.join(&Token::Comma.to_string()),
                 Token::CloseParenthesis
             ))
@@ -132,7 +132,7 @@ mod mini {
             Ok(format!(
                 "{}{}{}{}",
                 Token::StructMarker,
-                Token::OpenParenthesis,
+                Token::TupleOpen,
                 fields.join(&Token::Comma.to_string()),
                 Token::CloseParenthesis
             ))
@@ -317,11 +317,7 @@ mod pretty {
 
         fn encode_tuple(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok(format!(
-                    "{}{}",
-                    Token::OpenParenthesis,
-                    Token::CloseParenthesis
-                ));
+                return Ok(format!("{}{}", Token::TupleOpen, Token::CloseParenthesis));
             }
 
             let current_indent = self.indent(depth);
@@ -331,7 +327,7 @@ mod pretty {
             let mut single_line_length = 0;
             let mut can_fit_single_line = true;
 
-            single_line_length += 1; // OpenParenthesis
+            single_line_length += 1; // TupleOpen
 
             for (i, member) in value.iter().enumerate() {
                 let encoded_member = self.encode_value(member, depth + 1)?;
@@ -366,7 +362,7 @@ mod pretty {
             if can_fit_single_line {
                 return Ok(format!(
                     "{}{}{}",
-                    Token::OpenParenthesis,
+                    Token::TupleOpen,
                     members.join(&format!("{} ", Token::Comma)),
                     Token::CloseParenthesis
                 ));
@@ -376,7 +372,7 @@ mod pretty {
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str(&format!("{}\n", Token::OpenParenthesis));
+            output.push_str(&format!("{}\n", Token::TupleOpen));
 
             for (i, encoded_member) in members.into_iter().enumerate() {
                 let mut formatted_member = encoded_member;
@@ -517,7 +513,7 @@ mod pretty {
                 return Ok(format!(
                     "{}{}{}",
                     Token::StructMarker,
-                    Token::OpenParenthesis,
+                    Token::TupleOpen,
                     Token::CloseParenthesis
                 ));
             }
@@ -542,11 +538,7 @@ mod pretty {
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str(&format!(
-                "{}{}",
-                Token::StructMarker,
-                Token::OpenParenthesis
-            ));
+            output.push_str(&format!("{}{}", Token::StructMarker, Token::TupleOpen));
 
             for (i, encoded_field) in fields.into_iter().enumerate() {
                 let mut formatted_field = encoded_field;

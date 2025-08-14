@@ -6,7 +6,7 @@ pub(crate) enum Token {
     StructMarker,       // @
     ArrayOpen,          // [
     ArrayClose,         // ]
-    OpenParenthesis,    // (
+    TupleOpen,          // (
     CloseParenthesis,   // )
     OpenBrace,          // {
     CloseBrace,         // }
@@ -27,7 +27,7 @@ impl Token {
             Token::StructMarker => Some('@'),
             Token::ArrayOpen => Some('['),
             Token::ArrayClose => Some(']'),
-            Token::OpenParenthesis => Some('('),
+            Token::TupleOpen => Some('('),
             Token::CloseParenthesis => Some(')'),
             Token::OpenBrace => Some('{'),
             Token::CloseBrace => Some('}'),
@@ -50,7 +50,7 @@ impl core::fmt::Display for Token {
             Token::StructMarker => core::write!(f, "@"),
             Token::ArrayOpen => core::write!(f, "["),
             Token::ArrayClose => core::write!(f, "]"),
-            Token::OpenParenthesis => core::write!(f, "("),
+            Token::TupleOpen => core::write!(f, "("),
             Token::CloseParenthesis => core::write!(f, ")"),
             Token::OpenBrace => core::write!(f, "{{"),
             Token::CloseBrace => core::write!(f, "}}"),

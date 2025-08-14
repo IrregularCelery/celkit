@@ -301,7 +301,7 @@ impl Decoder {
             Some('@') => self.find_char(Token::StructMarker),
             Some('[') => self.find_char(Token::ArrayOpen),
             Some(']') => self.find_char(Token::ArrayClose),
-            Some('(') => self.find_char(Token::OpenParenthesis),
+            Some('(') => self.find_char(Token::TupleOpen),
             Some(')') => self.find_char(Token::CloseParenthesis),
             Some('{') => self.find_char(Token::OpenBrace),
             Some('}') => self.find_char(Token::CloseBrace),
@@ -331,10 +331,10 @@ impl Decoder {
 
     fn decode_struct(&mut self) -> Result<Value> {
         self.expect_token(
-            Token::OpenParenthesis,
+            Token::TupleOpen,
             &format!(
                 "struct definition: (expected '{}' after '{}')",
-                Token::OpenParenthesis,
+                Token::TupleOpen,
                 Token::StructMarker,
             ),
         )?;
@@ -574,7 +574,7 @@ impl Decoder {
                 "Unexpected '{}' - found closing bracket without matching opening bracket",
                 Token::ArrayClose
             ))),
-            Token::OpenParenthesis => self.decode_tuple(),
+            Token::TupleOpen => self.decode_tuple(),
             Token::CloseParenthesis => Err(self.error(format!(
                 "Unexpected '{}' - found closing parenthesis without matching opening parenthesis",
                 Token::CloseParenthesis,
