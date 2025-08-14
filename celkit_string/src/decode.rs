@@ -45,17 +45,19 @@ impl Decoder {
     }
 
     fn advance(&mut self) {
-        self.position += 1;
-        self.current_char = self.input.get(self.position).copied();
-
-        if let Some('\n') = self.current_char {
-            self.line += 1;
-            self.column = 1;
-
-            return;
+        match self.current_char {
+            Some('\n') => {
+                self.line += 1;
+                self.column = 1;
+            }
+            Some(_) => {
+                self.column += 1;
+            }
+            None => {} // End of input
         }
 
-        self.column += 1;
+        self.position += 1;
+        self.current_char = self.input.get(self.position).copied();
     }
 
     fn skip_whitespace(&mut self) {
