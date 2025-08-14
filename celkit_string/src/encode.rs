@@ -77,7 +77,7 @@ mod mini {
                 "{}{}{}",
                 Token::ArrayOpen,
                 items.join(&Token::Comma.to_string()),
-                Token::CloseBracket
+                Token::ArrayClose
             ))
         }
 
@@ -223,7 +223,7 @@ mod pretty {
 
         fn encode_array(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok(format!("{}{}", Token::ArrayOpen, Token::CloseBracket));
+                return Ok(format!("{}{}", Token::ArrayOpen, Token::ArrayClose));
             }
 
             let current_indent = self.indent(depth);
@@ -250,7 +250,7 @@ mod pretty {
             }
 
             if can_fit_single_line {
-                single_line_length += 1; // CloseBracket
+                single_line_length += 1; // ArrayClose
 
                 // It's safe to assume this value is a child (nested) element if
                 // the `depth` is non-zero. So, we add `1` to the length of the line
@@ -270,7 +270,7 @@ mod pretty {
                     "{}{}{}",
                     Token::ArrayOpen,
                     items.join(&format!("{} ", Token::Comma)),
-                    Token::CloseBracket
+                    Token::ArrayClose
                 ));
             }
 
@@ -310,7 +310,7 @@ mod pretty {
             }
 
             output.push_str(&current_indent);
-            output.push_str(&Token::CloseBracket.to_string());
+            output.push_str(&Token::ArrayClose.to_string());
 
             Ok(output)
         }

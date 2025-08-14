@@ -300,7 +300,7 @@ impl Decoder {
             None => Ok(Token::Eof),
             Some('@') => self.find_char(Token::StructMarker),
             Some('[') => self.find_char(Token::ArrayOpen),
-            Some(']') => self.find_char(Token::CloseBracket),
+            Some(']') => self.find_char(Token::ArrayClose),
             Some('(') => self.find_char(Token::OpenParenthesis),
             Some(')') => self.find_char(Token::CloseParenthesis),
             Some('{') => self.find_char(Token::OpenBrace),
@@ -416,11 +416,11 @@ impl Decoder {
         let mut empty = true;
 
         loop {
-            // Check for CloseBracket for handling empty arrays and trailing commas
+            // Check for ArrayClose for handling empty arrays and trailing commas
             self.skip_whitespace();
 
-            if self.current_char == Token::CloseBracket.get_char() {
-                self.advance(); // Consume CloseBracket
+            if self.current_char == Token::ArrayClose.get_char() {
+                self.advance(); // Consume ArrayClose
 
                 break;
             }
@@ -428,11 +428,11 @@ impl Decoder {
             if !empty {
                 self.expect_token(Token::Comma, "array items")?;
 
-                // Check again for CloseBracket for handling trailing comma
+                // Check again for ArrayClose for handling trailing comma
                 self.skip_whitespace();
 
-                if self.current_char == Token::CloseBracket.get_char() {
-                    self.advance(); // Consume CloseBracket
+                if self.current_char == Token::ArrayClose.get_char() {
+                    self.advance(); // Consume ArrayClose
 
                     break;
                 }
@@ -570,9 +570,9 @@ impl Decoder {
         match token {
             Token::StructMarker => self.decode_struct(),
             Token::ArrayOpen => self.decode_array(),
-            Token::CloseBracket => Err(self.error(format!(
+            Token::ArrayClose => Err(self.error(format!(
                 "Unexpected '{}' - found closing bracket without matching opening bracket",
-                Token::CloseBracket
+                Token::ArrayClose
             ))),
             Token::OpenParenthesis => self.decode_tuple(),
             Token::CloseParenthesis => Err(self.error(format!(

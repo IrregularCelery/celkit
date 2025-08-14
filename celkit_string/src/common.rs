@@ -5,7 +5,7 @@ use celkit_core::internal::Number;
 pub(crate) enum Token {
     StructMarker,       // @
     ArrayOpen,          // [
-    CloseBracket,       // ]
+    ArrayClose,         // ]
     OpenParenthesis,    // (
     CloseParenthesis,   // )
     OpenBrace,          // {
@@ -26,7 +26,7 @@ impl Token {
         match self {
             Token::StructMarker => Some('@'),
             Token::ArrayOpen => Some('['),
-            Token::CloseBracket => Some(']'),
+            Token::ArrayClose => Some(']'),
             Token::OpenParenthesis => Some('('),
             Token::CloseParenthesis => Some(')'),
             Token::OpenBrace => Some('{'),
@@ -49,7 +49,7 @@ impl core::fmt::Display for Token {
         match self {
             Token::StructMarker => core::write!(f, "@"),
             Token::ArrayOpen => core::write!(f, "["),
-            Token::CloseBracket => core::write!(f, "]"),
+            Token::ArrayClose => core::write!(f, "]"),
             Token::OpenParenthesis => core::write!(f, "("),
             Token::CloseParenthesis => core::write!(f, ")"),
             Token::OpenBrace => core::write!(f, "{{"),
