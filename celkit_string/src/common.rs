@@ -11,7 +11,7 @@ pub(crate) enum Token {
     ObjectOpen,         // {
     ObjectClose,        // }
     FieldAssign,        // =
-    Colon,              // :
+    KeyAssign,          // :
     Comma,              // ,
     Literal(String),    // "quoted string"
     Numeric(Number),    // 69, 4.20, etc.
@@ -32,7 +32,7 @@ impl Token {
             Token::ObjectOpen => Some('{'),
             Token::ObjectClose => Some('}'),
             Token::FieldAssign => Some('='),
-            Token::Colon => Some(':'),
+            Token::KeyAssign => Some(':'),
             Token::Comma => Some(','),
             Token::Literal(_) => None,
             Token::Numeric(_) => None,
@@ -55,7 +55,7 @@ impl core::fmt::Display for Token {
             Token::ObjectOpen => core::write!(f, "{{"),
             Token::ObjectClose => core::write!(f, "}}"),
             Token::FieldAssign => core::write!(f, "="),
-            Token::Colon => core::write!(f, ":"),
+            Token::KeyAssign => core::write!(f, ":"),
             Token::Comma => core::write!(f, ","),
             Token::Literal(l) => core::write!(f, "\"{}\"", l),
             Token::Numeric(n) => core::write!(f, "{}", n),

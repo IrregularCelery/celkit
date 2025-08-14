@@ -100,7 +100,7 @@ mod mini {
                     Ok(format!(
                         "\"{}\"{}{}",
                         escape_text(entry.0), // Entry key
-                        Token::Colon,
+                        Token::KeyAssign,
                         self.encode_value(entry.1)? // Entry value
                     ))
                 })
@@ -427,7 +427,7 @@ mod pretty {
                 let encoded_entry = format!(
                     "\"{}\"{} {}",
                     escape_text(entry.0), // Entry key
-                    Token::Colon,
+                    Token::KeyAssign,
                     self.encode_value(entry.1, depth + 1)? // Entry value
                 );
 
