@@ -122,7 +122,7 @@ mod mini {
                     Ok(format!(
                         "{}{}{}",
                         field.0, // Field name
-                        Token::Equals,
+                        Token::FieldAssign,
                         self.encode_value(field.1)? // Field value
                     ))
                 })
@@ -527,7 +527,7 @@ mod pretty {
                     Ok(format!(
                         "{} {} {}",
                         field.0, // Field name
-                        Token::Equals,
+                        Token::FieldAssign,
                         self.encode_value(field.1, depth + 1)? // Field value
                     ))
                 })

@@ -10,7 +10,7 @@ pub(crate) enum Token {
     TupleClose,         // )
     ObjectOpen,         // {
     ObjectClose,        // }
-    Equals,             // =
+    FieldAssign,        // =
     Colon,              // :
     Comma,              // ,
     Literal(String),    // "quoted string"
@@ -31,7 +31,7 @@ impl Token {
             Token::TupleClose => Some(')'),
             Token::ObjectOpen => Some('{'),
             Token::ObjectClose => Some('}'),
-            Token::Equals => Some('='),
+            Token::FieldAssign => Some('='),
             Token::Colon => Some(':'),
             Token::Comma => Some(','),
             Token::Literal(_) => None,
@@ -54,7 +54,7 @@ impl core::fmt::Display for Token {
             Token::TupleClose => core::write!(f, ")"),
             Token::ObjectOpen => core::write!(f, "{{"),
             Token::ObjectClose => core::write!(f, "}}"),
-            Token::Equals => core::write!(f, "="),
+            Token::FieldAssign => core::write!(f, "="),
             Token::Colon => core::write!(f, ":"),
             Token::Comma => core::write!(f, ","),
             Token::Literal(l) => core::write!(f, "\"{}\"", l),

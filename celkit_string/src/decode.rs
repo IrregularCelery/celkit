@@ -305,7 +305,7 @@ impl Decoder {
             Some(')') => self.find_char(Token::TupleClose),
             Some('{') => self.find_char(Token::ObjectOpen),
             Some('}') => self.find_char(Token::ObjectClose),
-            Some('=') => self.find_char(Token::Equals),
+            Some('=') => self.find_char(Token::FieldAssign),
             Some(':') => self.find_char(Token::Colon),
             Some(',') => self.find_char(Token::Comma),
             Some('"') => self.find_literal(),
@@ -372,18 +372,18 @@ impl Decoder {
                 Token::Identifier(i /* Field name */) => {
                     let token = self.next_token()?;
 
-                    if token != Token::Equals {
+                    if token != Token::FieldAssign {
                         return Err(match token {
                             Token::Colon => self.error(format!(
                                 "Found '{}' but expected '{}' after struct field name",
                                 Token::Colon,
-                                Token::Equals
+                                Token::FieldAssign
                             )),
                             Token::Eof => self
                                 .error(format!("Unexpected end of input after field name '{}'", i)),
                             _ => self.error(format!(
                                 "Expected '{}' after struct field name '{}'",
-                                Token::Equals,
+                                Token::FieldAssign,
                                 i
                             )),
                         });
@@ -523,9 +523,9 @@ impl Decoder {
 
                     if token != Token::Colon {
                         return Err(match token {
-                            Token::Equals => self.error(format!(
+                            Token::FieldAssign => self.error(format!(
                                 "Found '{}' but expected '{}' after object key",
-                                Token::Equals,
+                                Token::FieldAssign,
                                 Token::Colon
                             )),
                             Token::Eof => self
@@ -584,9 +584,9 @@ impl Decoder {
                 "Unexpected '{}' - found closing brace without matching opening brace",
                 Token::ObjectClose
             ))),
-            Token::Equals => Err(self.error(format!(
+            Token::FieldAssign => Err(self.error(format!(
                 "Unexpected '{}' - found equals sign where a value was expected",
-                Token::Equals
+                Token::FieldAssign
             ))),
             Token::Colon => Err(self.error(format!(
                 "Unexpected '{}' - found colon where a value was expected",
