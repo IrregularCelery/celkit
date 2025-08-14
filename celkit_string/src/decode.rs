@@ -307,7 +307,7 @@ impl Decoder {
             Some('}') => self.find_char(Token::ObjectClose),
             Some('=') => self.find_char(Token::FieldAssign),
             Some(':') => self.find_char(Token::KeyAssign),
-            Some(',') => self.find_char(Token::Comma),
+            Some(',') => self.find_char(Token::Separator),
             Some('"') => self.find_literal(),
             Some(c) if c.is_ascii_digit() || c == '-' => self.find_numeric(),
             Some(c) if c.is_alphabetic() => self.find_identifier_or_keyword(),
@@ -353,7 +353,7 @@ impl Decoder {
             }
 
             if !empty {
-                self.expect_token(Token::Comma, "struct fields")?;
+                self.expect_token(Token::Separator, "struct fields")?;
 
                 // Check again for TupleClose for handling trailing comma
                 self.skip_whitespace();
@@ -426,7 +426,7 @@ impl Decoder {
             }
 
             if !empty {
-                self.expect_token(Token::Comma, "array items")?;
+                self.expect_token(Token::Separator, "array items")?;
 
                 // Check again for ArrayClose for handling trailing comma
                 self.skip_whitespace();
@@ -464,7 +464,7 @@ impl Decoder {
             }
 
             if !empty {
-                self.expect_token(Token::Comma, "tuple members")?;
+                self.expect_token(Token::Separator, "tuple members")?;
 
                 // Check again for TupleClose for handling trailing comma
                 self.skip_whitespace();
@@ -502,7 +502,7 @@ impl Decoder {
             }
 
             if !empty {
-                self.expect_token(Token::Comma, "object entries")?;
+                self.expect_token(Token::Separator, "object entries")?;
 
                 // Check again for ObjectClose for handling trailing comma
                 self.skip_whitespace();
@@ -592,9 +592,9 @@ impl Decoder {
                 "Unexpected '{}' - found colon where a value was expected",
                 Token::KeyAssign
             ))),
-            Token::Comma => Err(self.error(format!(
+            Token::Separator => Err(self.error(format!(
                 "Unexpected '{}' - found comma where a value was expected",
-                Token::Comma
+                Token::Separator
             ))),
             Token::Literal(l) => Ok(Value::Text(l)),
             Token::Numeric(n) => Ok(Value::Number(n)),

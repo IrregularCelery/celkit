@@ -12,7 +12,7 @@ pub(crate) enum Token {
     ObjectClose,        // }
     FieldAssign,        // =
     KeyAssign,          // :
-    Comma,              // ,
+    Separator,          // ,
     Literal(String),    // "quoted string"
     Numeric(Number),    // 69, 4.20, etc.
     Boolean(bool),      // true/false
@@ -33,7 +33,7 @@ impl Token {
             Token::ObjectClose => Some('}'),
             Token::FieldAssign => Some('='),
             Token::KeyAssign => Some(':'),
-            Token::Comma => Some(','),
+            Token::Separator => Some(','),
             Token::Literal(_) => None,
             Token::Numeric(_) => None,
             Token::Boolean(_) => None,
@@ -56,7 +56,7 @@ impl core::fmt::Display for Token {
             Token::ObjectClose => core::write!(f, "}}"),
             Token::FieldAssign => core::write!(f, "="),
             Token::KeyAssign => core::write!(f, ":"),
-            Token::Comma => core::write!(f, ","),
+            Token::Separator => core::write!(f, ","),
             Token::Literal(l) => core::write!(f, "\"{}\"", l),
             Token::Numeric(n) => core::write!(f, "{}", n),
             Token::Boolean(b) => core::write!(f, "{}", b),

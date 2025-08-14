@@ -76,7 +76,7 @@ mod mini {
             Ok(format!(
                 "{}{}{}",
                 Token::ArrayOpen,
-                items.join(&Token::Comma.to_string()),
+                items.join(&Token::Separator.to_string()),
                 Token::ArrayClose
             ))
         }
@@ -88,7 +88,7 @@ mod mini {
             Ok(format!(
                 "{}{}{}",
                 Token::TupleOpen,
-                members.join(&Token::Comma.to_string()),
+                members.join(&Token::Separator.to_string()),
                 Token::TupleClose
             ))
         }
@@ -110,7 +110,7 @@ mod mini {
             Ok(format!(
                 "{}{}{}",
                 Token::ObjectOpen,
-                entries.join(&Token::Comma.to_string()),
+                entries.join(&Token::Separator.to_string()),
                 Token::ObjectClose
             ))
         }
@@ -133,7 +133,7 @@ mod mini {
                 "{}{}{}{}",
                 Token::StructMarker,
                 Token::TupleOpen,
-                fields.join(&Token::Comma.to_string()),
+                fields.join(&Token::Separator.to_string()),
                 Token::TupleClose
             ))
         }
@@ -244,7 +244,7 @@ mod pretty {
                     single_line_length += items[i].len();
 
                     if i < value.len() - 1 {
-                        single_line_length += 2; // Comma and space
+                        single_line_length += 2; // Separator and space
                     }
                 }
             }
@@ -269,7 +269,7 @@ mod pretty {
                 return Ok(format!(
                     "{}{}{}",
                     Token::ArrayOpen,
-                    items.join(&format!("{} ", Token::Comma)),
+                    items.join(&format!("{} ", Token::Separator)),
                     Token::ArrayClose
                 ));
             }
@@ -284,7 +284,7 @@ mod pretty {
                 let mut formatted_item = encoded_item;
 
                 if i < value.len() - 1 || self.trailing_comma {
-                    formatted_item.push_str(&format!("{} ", Token::Comma));
+                    formatted_item.push_str(&format!("{} ", Token::Separator));
                 }
 
                 // Check if this item would fit in the current line
@@ -338,7 +338,7 @@ mod pretty {
                     single_line_length += members[i].len();
 
                     if i < value.len() - 1 {
-                        single_line_length += 2; // Comma and space
+                        single_line_length += 2; // Separator and space
                     }
                 }
             }
@@ -363,7 +363,7 @@ mod pretty {
                 return Ok(format!(
                     "{}{}{}",
                     Token::TupleOpen,
-                    members.join(&format!("{} ", Token::Comma)),
+                    members.join(&format!("{} ", Token::Separator)),
                     Token::TupleClose
                 ));
             }
@@ -378,7 +378,7 @@ mod pretty {
                 let mut formatted_member = encoded_member;
 
                 if i < value.len() - 1 || self.trailing_comma {
-                    formatted_member.push_str(&format!("{} ", Token::Comma));
+                    formatted_member.push_str(&format!("{} ", Token::Separator));
                 }
 
                 // Check if this member would fit in the current line
@@ -437,7 +437,7 @@ mod pretty {
                     single_line_length += entries[i].len();
 
                     if i < value.len() - 1 {
-                        single_line_length += 2; // Comma and space
+                        single_line_length += 2; // Separator and space
                     }
                 }
             }
@@ -462,7 +462,7 @@ mod pretty {
                 return Ok(format!(
                     "{}{}{}",
                     Token::ObjectOpen,
-                    entries.join(&format!("{} ", Token::Comma)),
+                    entries.join(&format!("{} ", Token::Separator)),
                     Token::ObjectClose
                 ));
             }
@@ -477,7 +477,7 @@ mod pretty {
                 let mut formatted_entry = encoded_entry;
 
                 if i < value.len() - 1 || self.trailing_comma {
-                    formatted_entry.push_str(&format!("{} ", Token::Comma));
+                    formatted_entry.push_str(&format!("{} ", Token::Separator));
                 }
 
                 // Check if this entry would fit in the current line
@@ -544,7 +544,7 @@ mod pretty {
                 let mut formatted_field = encoded_field;
 
                 if i < value.len() - 1 || self.trailing_comma {
-                    formatted_field.push_str(&format!("{} ", Token::Comma));
+                    formatted_field.push_str(&format!("{} ", Token::Separator));
                 }
 
                 // Each field has its own line
