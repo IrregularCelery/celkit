@@ -111,7 +111,7 @@ mod mini {
                 "{}{}{}",
                 Token::ObjectOpen,
                 entries.join(&Token::Comma.to_string()),
-                Token::CloseBrace
+                Token::ObjectClose
             ))
         }
 
@@ -411,7 +411,7 @@ mod pretty {
 
         fn encode_object(&self, value: &BTreeMap<String, Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok(format!("{}{}", Token::ObjectOpen, Token::CloseBrace));
+                return Ok(format!("{}{}", Token::ObjectOpen, Token::ObjectClose));
             }
 
             let current_indent = self.indent(depth);
@@ -443,7 +443,7 @@ mod pretty {
             }
 
             if can_fit_single_line {
-                single_line_length += 1; // CloseBrace
+                single_line_length += 1; // ObjectClose
 
                 // It's safe to assume this value is a child (nested) element if
                 // the `depth` is non-zero. So, we add `1` to the length of the line
@@ -463,7 +463,7 @@ mod pretty {
                     "{}{}{}",
                     Token::ObjectOpen,
                     entries.join(&format!("{} ", Token::Comma)),
-                    Token::CloseBrace
+                    Token::ObjectClose
                 ));
             }
 
@@ -503,7 +503,7 @@ mod pretty {
             }
 
             output.push_str(&current_indent);
-            output.push_str(&Token::CloseBrace.to_string());
+            output.push_str(&Token::ObjectClose.to_string());
 
             Ok(output)
         }

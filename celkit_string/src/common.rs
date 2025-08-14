@@ -9,7 +9,7 @@ pub(crate) enum Token {
     TupleOpen,          // (
     TupleClose,         // )
     ObjectOpen,         // {
-    CloseBrace,         // }
+    ObjectClose,        // }
     Equals,             // =
     Colon,              // :
     Comma,              // ,
@@ -30,7 +30,7 @@ impl Token {
             Token::TupleOpen => Some('('),
             Token::TupleClose => Some(')'),
             Token::ObjectOpen => Some('{'),
-            Token::CloseBrace => Some('}'),
+            Token::ObjectClose => Some('}'),
             Token::Equals => Some('='),
             Token::Colon => Some(':'),
             Token::Comma => Some(','),
@@ -53,7 +53,7 @@ impl core::fmt::Display for Token {
             Token::TupleOpen => core::write!(f, "("),
             Token::TupleClose => core::write!(f, ")"),
             Token::ObjectOpen => core::write!(f, "{{"),
-            Token::CloseBrace => core::write!(f, "}}"),
+            Token::ObjectClose => core::write!(f, "}}"),
             Token::Equals => core::write!(f, "="),
             Token::Colon => core::write!(f, ":"),
             Token::Comma => core::write!(f, ","),

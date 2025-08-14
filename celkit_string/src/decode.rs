@@ -304,7 +304,7 @@ impl Decoder {
             Some('(') => self.find_char(Token::TupleOpen),
             Some(')') => self.find_char(Token::TupleClose),
             Some('{') => self.find_char(Token::ObjectOpen),
-            Some('}') => self.find_char(Token::CloseBrace),
+            Some('}') => self.find_char(Token::ObjectClose),
             Some('=') => self.find_char(Token::Equals),
             Some(':') => self.find_char(Token::Colon),
             Some(',') => self.find_char(Token::Comma),
@@ -492,11 +492,11 @@ impl Decoder {
         let mut empty = true;
 
         loop {
-            // Check for CloseBrace for handling empty objects and trailing commas
+            // Check for ObjectClose for handling empty objects and trailing commas
             self.skip_whitespace();
 
-            if self.current_char == Token::CloseBrace.get_char() {
-                self.advance(); // Consume CloseBrace
+            if self.current_char == Token::ObjectClose.get_char() {
+                self.advance(); // Consume ObjectClose
 
                 break;
             }
@@ -504,11 +504,11 @@ impl Decoder {
             if !empty {
                 self.expect_token(Token::Comma, "object entries")?;
 
-                // Check again for CloseBrace for handling trailing comma
+                // Check again for ObjectClose for handling trailing comma
                 self.skip_whitespace();
 
-                if self.current_char == Token::CloseBrace.get_char() {
-                    self.advance(); // Consume CloseBrace
+                if self.current_char == Token::ObjectClose.get_char() {
+                    self.advance(); // Consume ObjectClose
 
                     break;
                 }
@@ -548,7 +548,7 @@ impl Decoder {
                         Token::TupleClose
                     )))
                 }
-                Token::CloseBrace => {} // The end of the object or an empty object
+                Token::ObjectClose => {} // The end of the object or an empty object
                 Token::Identifier(i) => {
                     return Err(self.error(format!(
                         "Found unquoted identifier '{}' where object key was expected",
@@ -580,9 +580,9 @@ impl Decoder {
                 Token::TupleClose,
             ))),
             Token::ObjectOpen => self.decode_object(),
-            Token::CloseBrace => Err(self.error(format!(
+            Token::ObjectClose => Err(self.error(format!(
                 "Unexpected '{}' - found closing brace without matching opening brace",
-                Token::CloseBrace
+                Token::ObjectClose
             ))),
             Token::Equals => Err(self.error(format!(
                 "Unexpected '{}' - found equals sign where a value was expected",
