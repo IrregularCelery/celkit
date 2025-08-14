@@ -131,7 +131,7 @@ mod mini {
 
             Ok(format!(
                 "{}{}{}{}",
-                Token::At,
+                Token::StructMarker,
                 Token::OpenParenthesis,
                 fields.join(&Token::Comma.to_string()),
                 Token::CloseParenthesis
@@ -516,7 +516,7 @@ mod pretty {
             if value.is_empty() {
                 return Ok(format!(
                     "{}{}{}",
-                    Token::At,
+                    Token::StructMarker,
                     Token::OpenParenthesis,
                     Token::CloseParenthesis
                 ));
@@ -542,7 +542,11 @@ mod pretty {
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str(&format!("{}{}", Token::At, Token::OpenParenthesis));
+            output.push_str(&format!(
+                "{}{}",
+                Token::StructMarker,
+                Token::OpenParenthesis
+            ));
 
             for (i, encoded_field) in fields.into_iter().enumerate() {
                 let mut formatted_field = encoded_field;

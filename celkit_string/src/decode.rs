@@ -298,7 +298,7 @@ impl Decoder {
 
         match self.current_char {
             None => Ok(Token::Eof),
-            Some('@') => self.find_char(Token::At),
+            Some('@') => self.find_char(Token::StructMarker),
             Some('[') => self.find_char(Token::OpenBracket),
             Some(']') => self.find_char(Token::CloseBracket),
             Some('(') => self.find_char(Token::OpenParenthesis),
@@ -335,7 +335,7 @@ impl Decoder {
             &format!(
                 "struct definition: (expected '{}' after '{}')",
                 Token::OpenParenthesis,
-                Token::At,
+                Token::StructMarker,
             ),
         )?;
 
@@ -568,7 +568,7 @@ impl Decoder {
         let token = self.next_token()?;
 
         match token {
-            Token::At => self.decode_struct(),
+            Token::StructMarker => self.decode_struct(),
             Token::OpenBracket => self.decode_array(),
             Token::CloseBracket => Err(self.error(format!(
                 "Unexpected '{}' - found closing bracket without matching opening bracket",

@@ -3,7 +3,7 @@ use celkit_core::internal::Number;
 
 #[derive(PartialEq)]
 pub(crate) enum Token {
-    At,                 // @
+    StructMarker,       // @
     OpenBracket,        // [
     CloseBracket,       // ]
     OpenParenthesis,    // (
@@ -24,7 +24,7 @@ pub(crate) enum Token {
 impl Token {
     pub fn get_char(&self) -> Option<char> {
         match self {
-            Token::At => Some('@'),
+            Token::StructMarker => Some('@'),
             Token::OpenBracket => Some('['),
             Token::CloseBracket => Some(']'),
             Token::OpenParenthesis => Some('('),
@@ -47,7 +47,7 @@ impl Token {
 impl core::fmt::Display for Token {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Token::At => core::write!(f, "@"),
+            Token::StructMarker => core::write!(f, "@"),
             Token::OpenBracket => core::write!(f, "["),
             Token::CloseBracket => core::write!(f, "]"),
             Token::OpenParenthesis => core::write!(f, "("),
