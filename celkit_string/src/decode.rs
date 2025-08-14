@@ -302,7 +302,7 @@ impl Decoder {
             Some('[') => self.find_char(Token::ArrayOpen),
             Some(']') => self.find_char(Token::ArrayClose),
             Some('(') => self.find_char(Token::TupleOpen),
-            Some(')') => self.find_char(Token::CloseParenthesis),
+            Some(')') => self.find_char(Token::TupleClose),
             Some('{') => self.find_char(Token::OpenBrace),
             Some('}') => self.find_char(Token::CloseBrace),
             Some('=') => self.find_char(Token::Equals),
@@ -343,11 +343,11 @@ impl Decoder {
         let mut empty = true;
 
         loop {
-            // Check for CloseParenthesis for handling empty structs and trailing commas
+            // Check for TupleClose for handling empty structs and trailing commas
             self.skip_whitespace();
 
-            if self.current_char == Token::CloseParenthesis.get_char() {
-                self.advance(); // Consume CloseParenthesis
+            if self.current_char == Token::TupleClose.get_char() {
+                self.advance(); // Consume TupleClose
 
                 break;
             }
@@ -355,11 +355,11 @@ impl Decoder {
             if !empty {
                 self.expect_token(Token::Comma, "struct fields")?;
 
-                // Check again for CloseParenthesis for handling trailing comma
+                // Check again for TupleClose for handling trailing comma
                 self.skip_whitespace();
 
-                if self.current_char == Token::CloseParenthesis.get_char() {
-                    self.advance(); // Consume CloseParenthesis
+                if self.current_char == Token::TupleClose.get_char() {
+                    self.advance(); // Consume TupleClose
 
                     break;
                 }
@@ -396,10 +396,10 @@ impl Decoder {
                 Token::Eof => {
                     return Err(self.error(format!(
                         "Unexpected end of input while parsing struct: Missing closing '{}'",
-                        Token::CloseParenthesis
+                        Token::TupleClose
                     )))
                 }
-                Token::CloseParenthesis => {
+                Token::TupleClose => {
                     // The end of the struct or an empty struct, already handled
                 }
                 _ => return Err(self.error("Expected field name in struct")),
@@ -454,11 +454,11 @@ impl Decoder {
         let mut empty = true;
 
         loop {
-            // Check for CloseParenthesis for handling empty tuples and trailing commas
+            // Check for TupleClose for handling empty tuples and trailing commas
             self.skip_whitespace();
 
-            if self.current_char == Token::CloseParenthesis.get_char() {
-                self.advance(); // Consume CloseParenthesis
+            if self.current_char == Token::TupleClose.get_char() {
+                self.advance(); // Consume TupleClose
 
                 break;
             }
@@ -466,11 +466,11 @@ impl Decoder {
             if !empty {
                 self.expect_token(Token::Comma, "tuple members")?;
 
-                // Check again for CloseParenthesis for handling trailing comma
+                // Check again for TupleClose for handling trailing comma
                 self.skip_whitespace();
 
-                if self.current_char == Token::CloseParenthesis.get_char() {
-                    self.advance(); // Consume CloseParenthesis
+                if self.current_char == Token::TupleClose.get_char() {
+                    self.advance(); // Consume TupleClose
 
                     break;
                 }
@@ -545,7 +545,7 @@ impl Decoder {
                 Token::Eof => {
                     return Err(self.error(format!(
                         "Unexpected end of input while parsing object: Missing closing '{}'",
-                        Token::CloseParenthesis
+                        Token::TupleClose
                     )))
                 }
                 Token::CloseBrace => {} // The end of the object or an empty object
@@ -575,9 +575,9 @@ impl Decoder {
                 Token::ArrayClose
             ))),
             Token::TupleOpen => self.decode_tuple(),
-            Token::CloseParenthesis => Err(self.error(format!(
+            Token::TupleClose => Err(self.error(format!(
                 "Unexpected '{}' - found closing parenthesis without matching opening parenthesis",
-                Token::CloseParenthesis,
+                Token::TupleClose,
             ))),
             Token::OpenBrace => self.decode_object(),
             Token::CloseBrace => Err(self.error(format!(

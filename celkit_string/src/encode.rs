@@ -89,7 +89,7 @@ mod mini {
                 "{}{}{}",
                 Token::TupleOpen,
                 members.join(&Token::Comma.to_string()),
-                Token::CloseParenthesis
+                Token::TupleClose
             ))
         }
 
@@ -134,7 +134,7 @@ mod mini {
                 Token::StructMarker,
                 Token::TupleOpen,
                 fields.join(&Token::Comma.to_string()),
-                Token::CloseParenthesis
+                Token::TupleClose
             ))
         }
 
@@ -317,7 +317,7 @@ mod pretty {
 
         fn encode_tuple(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
             if value.is_empty() {
-                return Ok(format!("{}{}", Token::TupleOpen, Token::CloseParenthesis));
+                return Ok(format!("{}{}", Token::TupleOpen, Token::TupleClose));
             }
 
             let current_indent = self.indent(depth);
@@ -344,7 +344,7 @@ mod pretty {
             }
 
             if can_fit_single_line {
-                single_line_length += 1; // CloseParenthesis
+                single_line_length += 1; // TupleClose
 
                 // It's safe to assume this value is a child (nested) element if
                 // the `depth` is non-zero. So, we add `1` to the length of the line
@@ -364,7 +364,7 @@ mod pretty {
                     "{}{}{}",
                     Token::TupleOpen,
                     members.join(&format!("{} ", Token::Comma)),
-                    Token::CloseParenthesis
+                    Token::TupleClose
                 ));
             }
 
@@ -404,7 +404,7 @@ mod pretty {
             }
 
             output.push_str(&current_indent);
-            output.push_str(&Token::CloseParenthesis.to_string());
+            output.push_str(&Token::TupleClose.to_string());
 
             Ok(output)
         }
@@ -514,7 +514,7 @@ mod pretty {
                     "{}{}{}",
                     Token::StructMarker,
                     Token::TupleOpen,
-                    Token::CloseParenthesis
+                    Token::TupleClose
                 ));
             }
 
@@ -561,7 +561,7 @@ mod pretty {
             }
 
             output.push_str(&current_indent);
-            output.push_str(&Token::CloseParenthesis.to_string());
+            output.push_str(&Token::TupleClose.to_string());
 
             Ok(output)
         }
