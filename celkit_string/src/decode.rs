@@ -70,10 +70,14 @@ impl Decoder {
         }
     }
 
-    fn find_char(&mut self, token: Token) -> Result<Token> {
-        self.advance();
+    fn find_char(&mut self, c: char) -> Result<Token> {
+        if let Some(token) = Token::from_char(c) {
+            self.advance();
 
-        Ok(token)
+            return Ok(token);
+        }
+
+        Err(self.error(format!("Unexpected character: '{}'", c)))
     }
 
     fn find_literal(&mut self) -> Result<Token> {
@@ -300,20 +304,10 @@ impl Decoder {
 
         match self.current_char {
             None => Ok(Token::Eof),
-            Some('@') => self.find_char(Token::StructMarker),
-            Some('[') => self.find_char(Token::ArrayOpen),
-            Some(']') => self.find_char(Token::ArrayClose),
-            Some('(') => self.find_char(Token::TupleOpen),
-            Some(')') => self.find_char(Token::TupleClose),
-            Some('{') => self.find_char(Token::ObjectOpen),
-            Some('}') => self.find_char(Token::ObjectClose),
-            Some('=') => self.find_char(Token::FieldAssign),
-            Some(':') => self.find_char(Token::KeyAssign),
-            Some(',') => self.find_char(Token::Separator),
             Some('"') => self.find_literal(),
             Some(c) if c.is_ascii_digit() || c == '-' => self.find_numeric(),
             Some(c) if c.is_alphabetic() => self.find_identifier_or_keyword(),
-            Some(c) => Err(self.error(format!("Unexpected character: '{}'", c))),
+            Some(c) => self.find_char(c),
         }
     }
 
@@ -348,7 +342,7 @@ impl Decoder {
             // Check for TupleClose for handling empty structs and trailing commas
             self.skip_whitespace();
 
-            if self.current_char == Token::TupleClose.get_char() {
+            if self.current_char == Token::TupleClose.to_char() {
                 self.advance(); // Consume TupleClose
 
                 break;
@@ -360,7 +354,7 @@ impl Decoder {
                 // Check again for TupleClose for handling trailing comma
                 self.skip_whitespace();
 
-                if self.current_char == Token::TupleClose.get_char() {
+                if self.current_char == Token::TupleClose.to_char() {
                     self.advance(); // Consume TupleClose
 
                     break;
@@ -421,7 +415,7 @@ impl Decoder {
             // Check for ArrayClose for handling empty arrays and trailing commas
             self.skip_whitespace();
 
-            if self.current_char == Token::ArrayClose.get_char() {
+            if self.current_char == Token::ArrayClose.to_char() {
                 self.advance(); // Consume ArrayClose
 
                 break;
@@ -433,7 +427,7 @@ impl Decoder {
                 // Check again for ArrayClose for handling trailing comma
                 self.skip_whitespace();
 
-                if self.current_char == Token::ArrayClose.get_char() {
+                if self.current_char == Token::ArrayClose.to_char() {
                     self.advance(); // Consume ArrayClose
 
                     break;
@@ -459,7 +453,7 @@ impl Decoder {
             // Check for TupleClose for handling empty tuples and trailing commas
             self.skip_whitespace();
 
-            if self.current_char == Token::TupleClose.get_char() {
+            if self.current_char == Token::TupleClose.to_char() {
                 self.advance(); // Consume TupleClose
 
                 break;
@@ -471,7 +465,7 @@ impl Decoder {
                 // Check again for TupleClose for handling trailing comma
                 self.skip_whitespace();
 
-                if self.current_char == Token::TupleClose.get_char() {
+                if self.current_char == Token::TupleClose.to_char() {
                     self.advance(); // Consume TupleClose
 
                     break;
@@ -497,7 +491,7 @@ impl Decoder {
             // Check for ObjectClose for handling empty objects and trailing commas
             self.skip_whitespace();
 
-            if self.current_char == Token::ObjectClose.get_char() {
+            if self.current_char == Token::ObjectClose.to_char() {
                 self.advance(); // Consume ObjectClose
 
                 break;
@@ -509,7 +503,7 @@ impl Decoder {
                 // Check again for ObjectClose for handling trailing comma
                 self.skip_whitespace();
 
-                if self.current_char == Token::ObjectClose.get_char() {
+                if self.current_char == Token::ObjectClose.to_char() {
                     self.advance(); // Consume ObjectClose
 
                     break;
