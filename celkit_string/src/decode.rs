@@ -29,16 +29,20 @@ impl Decoder {
     }
 
     fn error(&self, message: impl Into<String>) -> Error {
-        let mut context = String::new();
         let radius = 10; // Radius around the position for context
-
         let start = self.position.saturating_sub(radius);
         let end = (self.position + radius + 1).min(self.input.len());
-        let content: String = self.input[start..end].iter().collect();
+        let position = self.position - start; // Position of problematic character
 
-        context.push_str(&content);
+        // + 2 for '\n' and '^'
+        let mut context = String::with_capacity((end - start) + radius + position + 2);
+
+        for &c in &self.input[start..end] {
+            context.push(c);
+        }
+
         context.push('\n');
-        context.push_str(&" ".repeat(self.position - start));
+        context.push_str(&" ".repeat(position));
         context.push('^');
 
         Error::with_context(message, context, self.line, self.column)
