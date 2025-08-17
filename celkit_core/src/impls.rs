@@ -250,6 +250,18 @@ impl Deserialize for f32 {
         match value {
             Value::Number(Number::F32(number)) => Ok(number),
             Value::Number(Number::F64(number)) => {
+                if number.is_infinite() {
+                    if number.is_sign_positive() {
+                        return Ok(f32::INFINITY);
+                    }
+
+                    return Ok(f32::NEG_INFINITY);
+                }
+
+                if number.is_nan() {
+                    return Ok(f32::NAN);
+                }
+
                 if number < f32::MIN as f64 || number > f32::MAX as f64 {
                     return Err(Error::new("f64 value out of range for f32"));
                 }
@@ -283,7 +295,21 @@ impl Deserialize for f64 {
     fn deserialize(value: Value) -> Result<Self> {
         match value {
             Value::Number(Number::F64(number)) => Ok(number),
-            Value::Number(Number::F32(number)) => Ok(number as f64),
+            Value::Number(Number::F32(number)) => {
+                if number.is_infinite() {
+                    if number.is_sign_positive() {
+                        return Ok(f64::INFINITY);
+                    }
+
+                    return Ok(f64::NEG_INFINITY);
+                }
+
+                if number.is_nan() {
+                    return Ok(f64::NAN);
+                }
+
+                Ok(number as f64)
+            }
             Value::Number(number) => {
                 // Convert integers to f64
                 let n = match number {
