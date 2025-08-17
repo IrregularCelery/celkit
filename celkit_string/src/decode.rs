@@ -32,17 +32,11 @@ impl Decoder {
         let radius = 10; // Radius around the position for context
         let start = self.position.saturating_sub(radius);
         let end = (self.position + radius + 1).min(self.input.len());
-        let position = self.position - start; // Position of problematic character
 
-        // + 2 for '\n' and '^'
-        let mut context = String::with_capacity((end - start) + radius + position + 2);
-
-        for &c in &self.input[start..end] {
-            context.push(c);
-        }
+        let mut context: String = self.input[start..end].iter().collect();
 
         context.push('\n');
-        context.push_str(&" ".repeat(position));
+        context.push_str(&" ".repeat(self.position - start));
         context.push('^');
 
         Error::with_context(message, context, self.line, self.column)
@@ -195,22 +189,53 @@ impl Decoder {
     fn find_numeric(&mut self) -> Result<Token> {
         let mut numeric = String::new();
         let mut has_decimal = false;
+        let mut has_exponent = false;
 
-        // Must start with digit or minus sign
-        if !matches!(self.current_char, Some(c) if c.is_ascii_digit() || c == '-') {
-            return Err(self.error("Expected number".to_string()));
+        // Handle positive/negative sign
+        if let Some(c) = self.current_char {
+            if c == '+' || c == '-' {
+                numeric.push(c);
+
+                self.advance(); // Consume the sign character
+            }
         }
 
-        // Handle negative sign
-        if let Some('-') = self.current_char {
-            numeric.push('-');
+        if let Some(_) = self.current_char {
+            // Check if enough characters for "inf" or "nan"
+            if self.position + 2 < self.input.len() {
+                let keyword: String = self.input[self.position..self.position + 3]
+                    .iter()
+                    .collect();
+                let keyword = keyword.to_lowercase();
 
-            self.advance(); // Consume character '-'
+                if keyword == "inf" {
+                    // Consume the three characters
+                    for _ in 0..3 {
+                        self.advance();
+                    }
 
-            // Must have digit after negative sign
-            if !matches!(self.current_char, Some(c) if c.is_ascii_digit()) {
-                return Err(self.error("Expected digit after '-' in number".to_string()));
+                    return Ok(Token::Numeric(Number::F64(if numeric != "-" {
+                        f64::INFINITY
+                    } else {
+                        f64::NEG_INFINITY
+                    })));
+                }
+
+                if keyword == "nan" {
+                    // Consume the three characters
+                    for _ in 0..3 {
+                        self.advance();
+                    }
+
+                    // NaN doesn't have a sign so if the input contained one, we ignore it
+                    return Ok(Token::Numeric(Number::F64(f64::NAN)));
+                }
             }
+        }
+
+        // Must start with digit if not a keyword
+        if !matches!(self.current_char, Some(c) if c.is_ascii_digit()) {
+            return Err(self.error("Expected number".to_string()));
         }
 
         while let Some(c) = self.current_char {
@@ -237,13 +262,36 @@ impl Decoder {
                 continue;
             }
 
+            if (c == 'e' || c == 'E') && !has_exponent {
+                has_exponent = true;
+
+                numeric.push(c);
+
+                self.advance(); // Consume character 'e'
+
+                // Handle positive/negative sign after exponent
+                if let Some(c) = self.current_char {
+                    if c == '+' || c == '-' {
+                        numeric.push(c);
+
+                        self.advance(); // Consume the sign character
+                    }
+                }
+
+                // Must have digit after exponent
+                if !matches!(self.current_char, Some(c) if c.is_ascii_digit()) {
+                    return Err(self.error("Expected digit after exponent".to_string()));
+                }
+
+                continue;
+            }
+
             break;
         }
 
-        if has_decimal {
+        if has_decimal || has_exponent {
             return match numeric.parse::<f64>() {
-                Ok(f) if f.is_finite() => Ok(Token::Numeric(Number::F64(f))),
-                Ok(_) => Err(self.error(format!("Float is too large: '{}'", numeric))),
+                Ok(f) => Ok(Token::Numeric(Number::F64(f))),
                 Err(_) => Err(self.error(format!("Invalid float: '{}'", numeric))),
             };
         }
@@ -264,7 +312,10 @@ impl Decoder {
             try_parse!(i64, I64);
             try_parse!(i128, I128);
 
-            return Err(self.error(format!("Integer is too large: '{}'", numeric)));
+            return Err(self.error(format!(
+                "Integer is too large and exceeds the bounds of singed int: '{}'",
+                numeric
+            )));
         } else {
             // Try unsigned types first, then signed
             try_parse!(u8, U8);
@@ -278,7 +329,10 @@ impl Decoder {
             try_parse!(u128, U128);
             try_parse!(i128, I128);
 
-            return Err(self.error(format!("Integer is too large: '{}'", numeric)));
+            return Err(self.error(format!(
+                "Integer is too large and exceeds the bounds of unsinged int: '{}'",
+                numeric
+            )));
         }
     }
 
@@ -294,11 +348,14 @@ impl Decoder {
         }
 
         let identifer: String = self.input[start..self.position].iter().collect();
+        let identifer = identifer.to_lowercase();
 
         match identifer.as_str() {
+            "inf" => Ok(Token::Numeric(Number::F64(f64::INFINITY))),
+            "nan" => Ok(Token::Numeric(Number::F64(f64::NAN))),
             "true" => Ok(Token::Boolean(true)),
             "false" => Ok(Token::Boolean(false)),
-            "null" => Ok(Token::Null),
+            _ if identifer == Token::Null.to_string() => Ok(Token::Null),
             _ => Ok(Token::Identifier(identifer)),
         }
     }
@@ -309,7 +366,7 @@ impl Decoder {
         match self.current_char {
             None => Ok(Token::Eof),
             Some('"') => self.find_literal(),
-            Some(c) if c.is_ascii_digit() || c == '-' => self.find_numeric(),
+            Some(c) if c.is_ascii_digit() || c == '+' || c == '-' => self.find_numeric(),
             Some(c) if c.is_alphabetic() => self.find_identifier_or_keyword(),
             Some(c) => self.find_char(c),
         }
