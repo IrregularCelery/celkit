@@ -62,7 +62,54 @@ mod mini {
         }
 
         fn encode_number(&self, value: &Number) -> Result<String> {
-            Ok(value.to_string())
+            macro_rules! encode_float {
+                ($num:expr) => {{
+                    let n = $num;
+
+                    if n.is_nan() {
+                        return Ok("nan".to_string());
+                    }
+
+                    if n.is_infinite() {
+                        if n.is_sign_positive() {
+                            return Ok("inf".to_string());
+                        }
+
+                        return Ok("-inf".to_string());
+                    }
+
+                    if *n == 0.0 {
+                        if n.is_sign_positive() {
+                            return Ok("0.0".to_string());
+                        }
+
+                        return Ok("-0.0".to_string());
+                    }
+
+                    let abs_n = n.abs();
+
+                    // For the minified version we almost always use the exponent notation
+                    if abs_n > 1e4 || (abs_n <= 1e-4 && abs_n > 0.0) {
+                        return Ok(format!("{:e}", n));
+                    }
+
+                    let string = n.to_string();
+
+                    // If the string doesn't have a decimal point or an exponent, add '.0' for
+                    // better distinction between floats and integers
+                    if !string.contains('.') && !string.contains('e') && !string.contains('E') {
+                        return Ok(format!("{}.0", string));
+                    }
+
+                    Ok(string)
+                }};
+            }
+
+            match value {
+                Number::F32(n) => encode_float!(n),
+                Number::F64(n) => encode_float!(n),
+                integer => return Ok(integer.to_string()),
+            }
         }
 
         fn encode_text(&self, value: &String) -> Result<String> {
@@ -214,7 +261,54 @@ mod pretty {
         }
 
         fn encode_number(&self, value: &Number) -> Result<String> {
-            Ok(value.to_string())
+            macro_rules! encode_float {
+                ($num:expr) => {{
+                    let n = $num;
+
+                    if n.is_nan() {
+                        return Ok("nan".to_string());
+                    }
+
+                    if n.is_infinite() {
+                        if n.is_sign_positive() {
+                            return Ok("inf".to_string());
+                        }
+
+                        return Ok("-inf".to_string());
+                    }
+
+                    if *n == 0.0 {
+                        if n.is_sign_positive() {
+                            return Ok("0.0".to_string());
+                        }
+
+                        return Ok("-0.0".to_string());
+                    }
+
+                    let abs_n = n.abs();
+
+                    // Use exponent notation for very large or very small numbers
+                    if abs_n > 1e15 || (abs_n < 1e-5 && abs_n > 0.0) {
+                        return Ok(format!("{:e}", n));
+                    }
+
+                    let string = n.to_string();
+
+                    // If the string doesn't have a decimal point or an exponent, add '.0' for
+                    // better distinction between floats and integers
+                    if !string.contains('.') && !string.contains('e') && !string.contains('E') {
+                        return Ok(format!("{}.0", string));
+                    }
+
+                    Ok(string)
+                }};
+            }
+
+            match value {
+                Number::F32(n) => encode_float!(n),
+                Number::F64(n) => encode_float!(n),
+                integer => return Ok(integer.to_string()),
+            }
         }
 
         fn encode_text(&self, value: &String) -> Result<String> {
