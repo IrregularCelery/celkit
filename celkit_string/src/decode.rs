@@ -58,14 +58,118 @@ impl Decoder {
         self.current_char = self.input.get(self.position).copied();
     }
 
-    fn skip_whitespace(&mut self) {
-        while let Some(c) = self.current_char {
-            if !c.is_whitespace() {
-                break;
+    fn skip_comment_and_whitespace(&mut self) -> Result<()> {
+        let comment_marker = Token::CommentMarker
+            .to_char()
+            .expect("This SHOULD never happen for single-char tokens!");
+        let comment_multiline = Token::CommentMultiline
+            .to_char()
+            .expect("This SHOULD never happen for single-char tokens!");
+
+        loop {
+            // Skip whitespaces
+            while let Some(c) = self.current_char {
+                if !c.is_whitespace() {
+                    break;
+                }
+
+                self.advance(); // Consume the whitespace
             }
 
-            self.advance();
+            // Check for first comment character
+            if self.current_char != Some(comment_marker) {
+                break; // No more comment or whitespace
+            }
+
+            // Check for second comment character
+            let Some(next_c) = self.input.get(self.position + 1) else {
+                break; // End of input
+            };
+
+            if *next_c == comment_marker {
+                // Single-line comment
+
+                self.advance(); // Consume first CommentMarker
+                self.advance(); // Consume second CommentMarker
+
+                while let Some(c) = self.current_char {
+                    if c == '\n' {
+                        self.advance(); // Consume the newline
+
+                        break;
+                    }
+
+                    self.advance();
+                }
+
+                continue;
+            }
+
+            if *next_c == comment_multiline {
+                // Multi-line comment
+
+                self.advance(); // Consume CommentMarker
+                self.advance(); // Consume CommentMultiline
+
+                let mut depth = 1;
+
+                while let Some(c) = self.current_char {
+                    if c == comment_marker {
+                        // Check for nested comment
+
+                        let Some(next_c) = self.input.get(self.position + 1) else {
+                            self.advance(); // Consume the character to trigger end of input
+
+                            continue;
+                        };
+
+                        if *next_c == comment_multiline {
+                            self.advance(); // Consume CommentMarker
+                            self.advance(); // Consume CommentMultiline
+
+                            depth += 1;
+
+                            continue;
+                        }
+                    }
+
+                    if c == comment_multiline {
+                        // Check for end of multi-line comment
+
+                        let Some(next_c) = self.input.get(self.position + 1) else {
+                            self.advance(); // Consume the character to trigger end of input
+
+                            continue;
+                        };
+
+                        if *next_c == comment_marker {
+                            self.advance(); // Consume CommentMultiline
+                            self.advance(); // Consume CommentMarker
+
+                            depth -= 1;
+
+                            if depth == 0 {
+                                break; // End of outermost comment
+                            }
+
+                            continue;
+                        }
+                    }
+
+                    self.advance(); // Consume the character in the comment
+                }
+
+                if depth > 0 {
+                    return Err(self.error("Unterminated multi-line comment"));
+                }
+
+                continue;
+            }
+
+            break; // Not a comment
         }
+
+        Ok(())
     }
 
     fn find_char(&mut self, c: char) -> Result<Token> {
@@ -202,7 +306,7 @@ impl Decoder {
 
         if let Some(_) = self.current_char {
             // Check if enough characters for "inf" or "nan"
-            if self.position + 2 < self.input.len() {
+            if self.position + 3 <= self.input.len() {
                 let keyword: String = self.input[self.position..self.position + 3]
                     .iter()
                     .collect();
@@ -361,7 +465,7 @@ impl Decoder {
     }
 
     fn next_token(&mut self) -> Result<Token> {
-        self.skip_whitespace();
+        self.skip_comment_and_whitespace()?;
 
         match self.current_char {
             None => Ok(Token::Eof),
@@ -400,9 +504,9 @@ impl Decoder {
         let mut empty = true;
 
         loop {
-            // Check for TupleClose for handling empty structs and trailing commas
-            self.skip_whitespace();
+            self.skip_comment_and_whitespace()?;
 
+            // Check for TupleClose for handling empty structs
             if self.current_char == Token::TupleClose.to_char() {
                 self.advance(); // Consume TupleClose
 
@@ -412,8 +516,7 @@ impl Decoder {
             if !empty {
                 self.expect_token(Token::Separator, "struct fields")?;
 
-                // Check again for TupleClose for handling trailing comma
-                self.skip_whitespace();
+                self.skip_comment_and_whitespace()?;
 
                 if self.current_char == Token::TupleClose.to_char() {
                     self.advance(); // Consume TupleClose
@@ -473,9 +576,9 @@ impl Decoder {
         let mut empty = true;
 
         loop {
-            // Check for ArrayClose for handling empty arrays and trailing commas
-            self.skip_whitespace();
+            self.skip_comment_and_whitespace()?;
 
+            // Check for ArrayClose for handling empty arrays
             if self.current_char == Token::ArrayClose.to_char() {
                 self.advance(); // Consume ArrayClose
 
@@ -485,8 +588,7 @@ impl Decoder {
             if !empty {
                 self.expect_token(Token::Separator, "array items")?;
 
-                // Check again for ArrayClose for handling trailing comma
-                self.skip_whitespace();
+                self.skip_comment_and_whitespace()?;
 
                 if self.current_char == Token::ArrayClose.to_char() {
                     self.advance(); // Consume ArrayClose
@@ -511,8 +613,8 @@ impl Decoder {
         let mut empty = true;
 
         loop {
-            // Check for TupleClose for handling empty tuples and trailing commas
-            self.skip_whitespace();
+            // Check for TupleClose for handling empty tuples
+            self.skip_comment_and_whitespace()?;
 
             if self.current_char == Token::TupleClose.to_char() {
                 self.advance(); // Consume TupleClose
@@ -523,8 +625,7 @@ impl Decoder {
             if !empty {
                 self.expect_token(Token::Separator, "tuple members")?;
 
-                // Check again for TupleClose for handling trailing comma
-                self.skip_whitespace();
+                self.skip_comment_and_whitespace()?;
 
                 if self.current_char == Token::TupleClose.to_char() {
                     self.advance(); // Consume TupleClose
@@ -549,8 +650,8 @@ impl Decoder {
         let mut empty = true;
 
         loop {
-            // Check for ObjectClose for handling empty objects and trailing commas
-            self.skip_whitespace();
+            // Check for ObjectClose for handling empty objects
+            self.skip_comment_and_whitespace()?;
 
             if self.current_char == Token::ObjectClose.to_char() {
                 self.advance(); // Consume ObjectClose
@@ -561,8 +662,7 @@ impl Decoder {
             if !empty {
                 self.expect_token(Token::Separator, "object entries")?;
 
-                // Check again for ObjectClose for handling trailing comma
-                self.skip_whitespace();
+                self.skip_comment_and_whitespace()?;
 
                 if self.current_char == Token::ObjectClose.to_char() {
                     self.advance(); // Consume ObjectClose
@@ -653,6 +753,9 @@ impl Decoder {
                 "Unexpected '{}' - found comma where a value was expected",
                 Token::Separator
             ))),
+            Token::CommentMarker | Token::CommentMultiline => {
+                unreachable!("This SHOULD never happen because comments are already skipped!")
+            }
             Token::Literal(l) => Ok(Value::Text(l)),
             Token::Numeric(n) => Ok(Value::Number(n)),
             Token::Boolean(b) => Ok(Value::Boolean(b)),
