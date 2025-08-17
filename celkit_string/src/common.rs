@@ -47,6 +47,8 @@ pub(crate) enum Token {
     FieldAssign,        // =
     KeyAssign,          // :
     Separator,          // ,
+    CommentMarker,      // /
+    CommentMultiline,   // *
     Literal(String),    // "quoted string"
     Numeric(Number),    // 69, 4.20, etc.
     Boolean(bool),      // true/false
@@ -66,4 +68,6 @@ impl_for_token! {
     FieldAssign => '=',
     KeyAssign => ':',
     Separator => ',',
+    CommentMarker =>  '/',
+    CommentMultiline =>  '*',
 }
