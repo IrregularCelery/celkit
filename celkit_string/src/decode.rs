@@ -42,6 +42,10 @@ impl Decoder {
         Error::with_context(message, context, self.line, self.column)
     }
 
+    fn peek(&self) -> Option<&char> {
+        self.input.get(self.position + 1)
+    }
+
     fn advance(&mut self) {
         match self.current_char {
             Some('\n') => {
@@ -82,7 +86,7 @@ impl Decoder {
             }
 
             // Check for second comment character
-            let Some(next_c) = self.input.get(self.position + 1) else {
+            let Some(next_c) = self.peek() else {
                 break; // End of input
             };
 
@@ -117,7 +121,7 @@ impl Decoder {
                     if c == comment_marker {
                         // Check for nested comment
 
-                        let Some(next_c) = self.input.get(self.position + 1) else {
+                        let Some(next_c) = self.peek() else {
                             self.advance(); // Consume the character to trigger end of input
 
                             continue;
@@ -136,7 +140,7 @@ impl Decoder {
                     if c == comment_multiline {
                         // Check for end of multi-line comment
 
-                        let Some(next_c) = self.input.get(self.position + 1) else {
+                        let Some(next_c) = self.peek() else {
                             self.advance(); // Consume the character to trigger end of input
 
                             continue;
