@@ -451,16 +451,16 @@ impl Decoder {
             self.advance();
         }
 
-        let identifer: String = self.input[start..self.position].iter().collect();
-        let identifer = identifer.to_lowercase();
+        let identifier: String = self.input[start..self.position].iter().collect();
+        let identifier = identifier.to_lowercase();
 
-        match identifer.as_str() {
+        match identifier.as_str() {
             "inf" => Ok(Token::Numeric(Number::F64(f64::INFINITY))),
             "nan" => Ok(Token::Numeric(Number::F64(f64::NAN))),
             "true" => Ok(Token::Boolean(true)),
             "false" => Ok(Token::Boolean(false)),
-            _ if identifer == Token::Null.to_string() => Ok(Token::Null),
-            _ => Ok(Token::Identifier(identifer)),
+            _ if identifier == Token::Null.to_string() => Ok(Token::Null),
+            _ => Ok(Token::Identifier(identifier)),
         }
     }
 
