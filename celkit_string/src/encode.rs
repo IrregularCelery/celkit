@@ -1,3 +1,5 @@
+// TODO: Add support for reserved indentifers such as: nan, inf, etc. Rust-reserved ones as well.
+
 use celkit_core::internal::sys::*;
 
 fn escape_text(input: &str) -> String {
