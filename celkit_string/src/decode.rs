@@ -447,6 +447,19 @@ impl Decoder {
     fn find_identifier_or_keyword(&mut self) -> Result<Token> {
         let start = self.position;
 
+        // Handle raw identifier (r#keyword)
+        let mut is_raw_identifier = false;
+
+        if self.position + 1 < self.input.len() {
+            is_raw_identifier =
+                self.current_char == Some('r') && self.input[self.position + 1] == '#';
+        }
+
+        if is_raw_identifier {
+            self.advance(); // Consume character 'r'
+            self.advance(); // Consume character '#'
+        }
+
         while let Some(c) = self.current_char {
             if !c.is_alphanumeric() && c != '_' {
                 break;
