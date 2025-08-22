@@ -490,12 +490,11 @@ macro_rules! impl_for_struct {
 
         impl $crate::Serialize for $name {
             fn serialize(&self) -> $crate::internal::Result<$crate::internal::Value> {
-                let mut fields = $crate::internal::sys::BTreeMap::new();
+                let mut fields = $crate::internal::sys::Vec::new();
 
                 $(
-                    fields.insert(
-                        stringify!($field_name).to_string(),
-                        self.$field_name.serialize()?
+                    fields.push(
+                        (stringify!($field_name).to_string(), self.$field_name.serialize()?)
                     );
                 )*
 
@@ -508,17 +507,28 @@ macro_rules! impl_for_struct {
                 match value {
                     $crate::internal::Value::Struct(fields) => {
                         $(
-                            let $field_name =
-                                match fields.get(stringify!($field_name)) {
-                                    Some(value) =>
-                                        <$field_type>::deserialize(value.clone())?,
-                                    None => return Err(
-                                        $crate::internal::Error::new(format!(
-                                            "Missing `{}` field",
-                                            stringify!($field_name)
-                                        ))
-                                    ),
-                            };
+                            let mut $field_name: Option<$field_type> = None;
+                        )*
+
+                        for (field_name, field_value) in fields {
+                            match field_name.as_str() {
+                                $(
+                                    stringify!($field_name) => {
+                                        $field_name = Some(<$field_type>::deserialize(field_value)?);
+                                    }
+                                )*
+                                _ => {} // Unknown field
+                            }
+                        }
+
+                        // Check whether all of the fields were found
+                        $(
+                            let $field_name = $field_name.ok_or_else(|| {
+                                $crate::internal::Error::new(format!(
+                                    "Missing `{}` field",
+                                    stringify!($field_name)
+                                ))
+                            })?;
                         )*
 
                         Ok($name {

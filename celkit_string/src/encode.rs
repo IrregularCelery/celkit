@@ -164,7 +164,7 @@ mod mini {
             ))
         }
 
-        fn encode_struct(&self, value: &BTreeMap<String, Value>) -> Result<String> {
+        fn encode_struct(&self, value: &Vec<(String, Value)>) -> Result<String> {
             let fields: Result<Vec<String>> = value
                 .iter()
                 .map(|field| {
@@ -172,7 +172,7 @@ mod mini {
                         "{}{}{}",
                         field.0, // Field name
                         Token::FieldAssign,
-                        self.encode_value(field.1)? // Field value
+                        self.encode_value(&field.1)? // Field value
                     ))
                 })
                 .collect();
@@ -604,7 +604,7 @@ mod pretty {
             Ok(output)
         }
 
-        fn encode_struct(&self, value: &BTreeMap<String, Value>, depth: usize) -> Result<String> {
+        fn encode_struct(&self, value: &Vec<(String, Value)>, depth: usize) -> Result<String> {
             if value.is_empty() {
                 return Ok(format!(
                     "{}{}{}",
@@ -624,7 +624,7 @@ mod pretty {
                         "{} {} {}",
                         field.0, // Field name
                         Token::FieldAssign,
-                        self.encode_value(field.1, depth + 1)? // Field value
+                        self.encode_value(&field.1, depth + 1)? // Field value
                     ))
                 })
                 .collect();

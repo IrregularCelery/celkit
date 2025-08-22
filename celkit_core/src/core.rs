@@ -44,7 +44,7 @@ pub enum Value {
     Array(Vec<Value>),
     Tuple(Vec<Value>),
     Object(BTreeMap<String, Value>),
-    Struct(BTreeMap<String, Value>),
+    Struct(Vec<(String, Value)>),
 }
 
 #[derive(Debug)]

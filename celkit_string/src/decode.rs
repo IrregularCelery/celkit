@@ -517,7 +517,7 @@ impl Decoder {
             ),
         )?;
 
-        let mut fields = BTreeMap::new();
+        let mut fields = Vec::new();
         let mut empty = true;
 
         loop {
@@ -568,7 +568,7 @@ impl Decoder {
 
                     let value = self.decode_value()?;
 
-                    fields.insert(i, value);
+                    fields.push((i, value));
                 }
                 Token::Eof => {
                     return Err(self.error(format!(
