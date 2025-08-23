@@ -55,7 +55,6 @@ pub struct Error {
     pub column: Option<usize>,
 }
 
-// TODO: Probably better to move this into `decode` module and have a separate one for `encode`
 impl Error {
     pub fn new(message: impl Into<String>) -> Self {
         Self {
