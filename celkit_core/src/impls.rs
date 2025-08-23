@@ -470,6 +470,7 @@ impl<V: Deserialize> Deserialize for std::collections::HashMap<String, V> {
 
 // ------------------------------- Struct --------------------------------- //
 
+// TODO: Unexpose the macro when the proc-macro is ready
 #[macro_export]
 macro_rules! impl_for_struct {
     (
@@ -496,7 +497,12 @@ macro_rules! impl_for_struct {
 
                 $(
                     fields.push(
-                        (stringify!($field_name).to_string(), self.$field_name.serialize()?)
+                        (
+                            $crate::internal::utils::unescape_identifier(
+                                stringify!($field_name)
+                            ).to_string(),
+                            self.$field_name.serialize()?
+                        )
                     );
                 )*
 
@@ -508,7 +514,9 @@ macro_rules! impl_for_struct {
             fn deserialize(value: $crate::internal::Value) -> $crate::internal::Result<Self> {
                 match value {
                     $crate::internal::Value::Struct(fields) => {
-                        let expected_fields = [$(stringify!($field_name)),*];
+                        let expected_fields = [$(
+                            $crate::internal::utils::unescape_identifier(stringify!($field_name))
+                        ),*];
 
                         let mut positional = false;
 
@@ -561,16 +569,19 @@ macro_rules! impl_for_struct {
 
                         // Unordered, we search for the values by names
                         for (field_name, field_value) in fields {
-                            match field_name.as_str() {
-                                $(
-                                    stringify!($field_name) => {
-                                        $field_name = Some(
-                                            <$field_type>::deserialize(field_value)?
-                                        );
-                                    }
-                                )*
-                                _ => {} // Unknown field
-                            }
+                            $(
+                                if field_name
+                                    == $crate::internal::utils::unescape_identifier(
+                                        stringify!($field_name)
+                                    )
+                                {
+                                    $field_name = Some(<$field_type>::deserialize(field_value)?);
+
+                                    continue;
+                                }
+                            )*
+
+                            // Unknown field, do nothing
                         }
 
                         // Check whether all of the fields were found
@@ -578,7 +589,9 @@ macro_rules! impl_for_struct {
                             let $field_name = $field_name.ok_or_else(|| {
                                 $crate::internal::Error::new(format!(
                                     "Missing `{}` field in `{}`",
-                                    stringify!($field_name),
+                                    $crate::internal::utils::unescape_identifier(
+                                        stringify!($field_name)
+                                    ),
                                     stringify!($name),
                                 ))
                             })?;
