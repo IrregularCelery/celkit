@@ -490,7 +490,9 @@ macro_rules! impl_for_struct {
 
         impl $crate::Serialize for $name {
             fn serialize(&self) -> $crate::internal::Result<$crate::internal::Value> {
-                let mut fields = $crate::internal::sys::Vec::new();
+                let mut fields = $crate::internal::sys::Vec::with_capacity(
+                    [$(stringify!($field_name)),*].len()
+                );
 
                 $(
                     fields.push(
@@ -506,15 +508,65 @@ macro_rules! impl_for_struct {
             fn deserialize(value: $crate::internal::Value) -> $crate::internal::Result<Self> {
                 match value {
                     $crate::internal::Value::Struct(fields) => {
+                        let expected_fields = [$(stringify!($field_name)),*];
+
+                        let mut positional = false;
+
+                        if fields.len() == expected_fields.len() {
+                            positional = true;
+
+                            for (i, (field_name, field_value)) in fields.iter().enumerate() {
+                                if field_name.is_empty() {
+                                    // Order must be correct or error
+                                    break;
+                                }
+
+                                if expected_fields[i] != field_name {
+                                    // Order isn't correct
+                                    positional = false;
+
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Ordered, we match the expected fields
+                        if positional {
+                            let mut fields_iter = fields.into_iter();
+
+                            $(
+                                let $field_name = {
+                                    let (_, field_value) = fields_iter
+                                        .next()
+                                        .expect(
+                                            "This SHOULD never happen because of length check!"
+                                        );
+
+                                    <$field_type>::deserialize(field_value)?
+                                };
+                            )*
+
+
+                            return Ok($name {
+                                $(
+                                    $field_name
+                                ),*
+                            });
+                        }
+
+
                         $(
                             let mut $field_name: Option<$field_type> = None;
                         )*
 
+                        // Unordered, we search for the values by names
                         for (field_name, field_value) in fields {
                             match field_name.as_str() {
                                 $(
                                     stringify!($field_name) => {
-                                        $field_name = Some(<$field_type>::deserialize(field_value)?);
+                                        $field_name = Some(
+                                            <$field_type>::deserialize(field_value)?
+                                        );
                                     }
                                 )*
                                 _ => {} // Unknown field
@@ -525,8 +577,9 @@ macro_rules! impl_for_struct {
                         $(
                             let $field_name = $field_name.ok_or_else(|| {
                                 $crate::internal::Error::new(format!(
-                                    "Missing `{}` field",
-                                    stringify!($field_name)
+                                    "Missing `{}` field in `{}`",
+                                    stringify!($field_name),
+                                    stringify!($name),
                                 ))
                             })?;
                         )*
@@ -538,7 +591,7 @@ macro_rules! impl_for_struct {
                         })
                     }
                     _ => Err($crate::internal::Error::new(
-                        format!("Expected struct for {}", stringify!($name))
+                        format!("Expected struct for `{}`", stringify!($name))
                     ))
                 }
             }
