@@ -12,6 +12,7 @@ pub mod internal {
     pub use crate::core::{Error, Number, Result, Value};
 
     pub mod sys {
+        pub use alloc::boxed::Box;
         pub use alloc::collections::BTreeMap;
         pub use alloc::format;
         pub use alloc::string::{String, ToString};

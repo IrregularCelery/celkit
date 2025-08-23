@@ -209,6 +209,20 @@ macro_rules! impl_for_tuple {
     };
 }
 
+// --------------------------------- Box ---------------------------------- //
+
+impl<T: Serialize> Serialize for Box<T> {
+    fn serialize(&self) -> Result<Value> {
+        self.as_ref().serialize()
+    }
+}
+
+impl<T: Deserialize> Deserialize for Box<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        Ok(Box::new(T::deserialize(value)?))
+    }
+}
+
 // ------------------------------- Option --------------------------------- //
 
 impl<T: Serialize> Serialize for Option<T> {
