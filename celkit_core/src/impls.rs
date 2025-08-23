@@ -98,9 +98,25 @@ macro_rules! impl_for_integer {
                                 ))
                             }),
                             Number::F32(n) => {
-                                let as_int = n as i128;
+                                if !n.is_finite() {
+                                    return Err(Error::new(format!(
+                                        "Cannot convert non-finite f32 {} to integer type {}",
+                                        n,
+                                        stringify!($type)
+                                    )));
+                                }
 
-                                if as_int as f32 != n {
+                                if n < <$type>::MIN as f32 || n > <$type>::MAX as f32 {
+                                    return Err(Error::new(format!(
+                                        "f32 number {} exceeds the bounds of {}",
+                                        n,
+                                        stringify!($type)
+                                    )));
+                                }
+
+                                let n_int = n as $type;
+
+                                if n_int as f32 != n {
                                     return Err(Error::new(format!(
                                         "Cannot convert f32 number {} to {} \
                                          without loss of precision",
@@ -109,33 +125,37 @@ macro_rules! impl_for_integer {
                                     )));
                                 }
 
-                                <$type>::try_from(as_int).map_err(|_| {
-                                    Error::new(format!(
-                                        "Cannot convert f32 number {} to {}",
-                                        n,
-                                        stringify!($type)
-                                    ))
-                                })
+                                Ok(n_int)
                             }
                             Number::F64(n) => {
-                                let as_int = n as i128;
-
-                                if as_int as f64 != n {
+                                if !n.is_finite() {
                                     return Err(Error::new(format!(
-                                        "Cannot convert f64 number {} to {} \
+                                        "Cannot convert non-finite f64 {} to integer type {}",
+                                        n,
+                                        stringify!($type)
+                                    )));
+                                }
+
+                                if n < <$type>::MIN as f64 || n > <$type>::MAX as f64 {
+                                    return Err(Error::new(format!(
+                                        "f64 number {} exceeds the bounds of {}",
+                                        n,
+                                        stringify!($type)
+                                    )));
+                                }
+
+                                let n_int = n as $type;
+
+                                if n_int as f64 != n {
+                                    return Err(Error::new(format!(
+                                        "Cannot convert f32 number {} to {} \
                                          without loss of precision",
                                         n,
                                         stringify!($type)
                                     )));
                                 }
 
-                                <$type>::try_from(as_int).map_err(|_| {
-                                    Error::new(format!(
-                                        "Cannot convert f64 number {} to {}",
-                                        n,
-                                        stringify!($type)
-                                    ))
-                                })
+                                Ok(n_int)
                             }
                         }
                     }
@@ -270,11 +290,23 @@ impl Deserialize for f32 {
                     return Ok(f32::NAN);
                 }
 
-                if number < f32::MIN as f64 || number > f32::MAX as f64 {
-                    return Err(Error::new("f64 value out of range for f32"));
+                let number_f32 = number as f32;
+
+                if number.is_finite() && number_f32.is_infinite() {
+                    return Err(Error::new(format!(
+                        "f64 value {} exceeds the bounds of f32",
+                        number
+                    )));
                 }
 
-                Ok(number as f32)
+                if number != 0.0 && number_f32 == 0.0 {
+                    return Err(Error::new(format!(
+                        "f64 value {} underflowed to zero for f32",
+                        number
+                    )));
+                }
+
+                Ok(number_f32)
             }
             Value::Number(number) => {
                 // Convert integers to f32
@@ -283,12 +315,78 @@ impl Deserialize for f32 {
                     Number::I8(n) => n as f32,
                     Number::U16(n) => n as f32,
                     Number::I16(n) => n as f32,
-                    Number::U32(n) => n as f32,
-                    Number::I32(n) => n as f32,
-                    Number::U64(n) => n as f32,
-                    Number::I64(n) => n as f32,
-                    Number::U128(n) => n as f32,
-                    Number::I128(n) => n as f32,
+                    Number::U32(n) => {
+                        let n_f32 = n as f32;
+
+                        if n_f32 as u32 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert u32 number {} to f32 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f32
+                    }
+                    Number::I32(n) => {
+                        let n_f32 = n as f32;
+
+                        if n_f32 as i32 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert i32 number {} to f32 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f32
+                    }
+                    Number::U64(n) => {
+                        let n_f32 = n as f32;
+
+                        if n_f32 as u64 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert u64 number {} to f32 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f32
+                    }
+                    Number::I64(n) => {
+                        let n_f32 = n as f32;
+
+                        if n_f32 as i64 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert i64 number {} to f32 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f32
+                    }
+                    Number::U128(n) => {
+                        let n_f32 = n as f32;
+
+                        if n_f32 as u128 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert u128 number {} to f32 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f32
+                    }
+                    Number::I128(n) => {
+                        let n_f32 = n as f32;
+
+                        if n_f32 as i128 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert i128 number {} to f32 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f32
+                    }
                     _ => unreachable!(),
                 };
 
@@ -327,10 +425,54 @@ impl Deserialize for f64 {
                     Number::I16(n) => n as f64,
                     Number::U32(n) => n as f64,
                     Number::I32(n) => n as f64,
-                    Number::U64(n) => n as f64,
-                    Number::I64(n) => n as f64,
-                    Number::U128(n) => n as f64,
-                    Number::I128(n) => n as f64,
+                    Number::U64(n) => {
+                        let n_f64 = n as f64;
+
+                        if n_f64 as u64 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert u64 number {} to f64 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f64
+                    }
+                    Number::I64(n) => {
+                        let n_f64 = n as f64;
+
+                        if n_f64 as i64 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert i64 number {} to f64 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f64
+                    }
+                    Number::U128(n) => {
+                        let n_f64 = n as f64;
+
+                        if n_f64 as u128 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert u128 number {} to f64 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f64
+                    }
+                    Number::I128(n) => {
+                        let n_f64 = n as f64;
+
+                        if n_f64 as i128 != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert i128 number {} to f64 without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f64
+                    }
                     _ => unreachable!(),
                 };
 
