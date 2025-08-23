@@ -1,5 +1,4 @@
 // TODO: Add implementations for these as well:
-//       - &str
 //       - Array slice
 //       - More std stuff
 //       - Enum
@@ -551,6 +550,14 @@ impl Deserialize for f64 {
             }
             _ => Err(Error::new("Expected `f64` number")),
         }
+    }
+}
+
+// -------------------------------- &str ---------------------------------- //
+
+impl Serialize for &str {
+    fn serialize(&self) -> Result<Value> {
+        Ok(Value::Text(self.to_string()))
     }
 }
 
