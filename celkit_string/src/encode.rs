@@ -88,7 +88,7 @@ mod mini {
                         return Ok("-0.0".to_string());
                     }
 
-                    let abs_n = n.abs();
+                    let abs_n = if *n < 0.0 { -*n } else { *n };
 
                     // For the minified version we almost always use the exponent notation
                     if abs_n > 1e4 || (abs_n <= 1e-4 && abs_n > 0.0) {
@@ -287,7 +287,7 @@ mod pretty {
                         return Ok("-0.0".to_string());
                     }
 
-                    let abs_n = n.abs();
+                    let abs_n = if *n < 0.0 { -*n } else { *n };
 
                     // Use exponent notation for very large or very small numbers
                     if abs_n > 1e15 || (abs_n < 1e-5 && abs_n > 0.0) {
