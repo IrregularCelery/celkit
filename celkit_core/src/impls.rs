@@ -1,6 +1,6 @@
 // TODO: Add implementations for these as well:
+//       - &str
 //       - Array slice
-//       - Empty tuple
 //       - More std stuff
 //       - Enum
 //       - Box
@@ -148,7 +148,7 @@ macro_rules! impl_for_integer {
 
                                 if n_int as f64 != n {
                                     return Err(Error::new(format!(
-                                        "Cannot convert f32 number {} to {} \
+                                        "Cannot convert f64 number {} to {} \
                                          without loss of precision",
                                         n,
                                         stringify!($type)
@@ -160,7 +160,7 @@ macro_rules! impl_for_integer {
                         }
                     }
                     _ => Err(Error::new(format!(
-                        "Expected number for {}",
+                        "Expected `{}` number",
                         stringify!($type)
                     ))),
                 }
@@ -183,26 +183,27 @@ macro_rules! impl_for_tuple {
         impl<$($member: Deserialize),+> Deserialize for ($($member,)+) {
             fn deserialize(value: Value) -> Result<Self> {
                 match value {
-                    Value::Tuple(mut tuple) => {
+                    Value::Tuple(tuple) => {
                         const EXPECTED_LEN: usize = 0
                             $(+ { let _ = stringify!($member); 1 })*;
 
                         if tuple.len() != EXPECTED_LEN {
                             return Err(Error::new(format!(
-                                "Expected tuple with {} elements, got {}",
+                                "Expected tuple with {} members, got {}",
                                 EXPECTED_LEN,
                                 tuple.len()
                             )));
                         }
 
-                        // Reverse the tuple members to pop in correct order
-                        tuple.reverse();
+                        let mut tuple_iter = tuple.into_iter();
 
                         Ok(($(
-                            $member::deserialize(tuple.pop().unwrap())?
+                            $member::deserialize(tuple_iter.next().expect(
+                                "This SHOULD never happen because of length check!"
+                            ))?
                         ),+,))
                     }
-                    _ => Err(Error::new("Expected tuple")),
+                    _ => Err(Error::new("Expected `tuple`")),
                 }
             }
         }
@@ -241,7 +242,7 @@ impl Deserialize for bool {
     fn deserialize(value: Value) -> Result<Self> {
         match value {
             Value::Boolean(bool) => Ok(bool),
-            _ => Err(Error::new("Expected bool")),
+            _ => Err(Error::new("Expected `bool`")),
         }
     }
 }
@@ -318,6 +319,13 @@ impl Deserialize for f32 {
                     Number::U32(n) => {
                         let n_f32 = n as f32;
 
+                        if n_f32.is_infinite() {
+                            return Err(Error::new(format!(
+                                "u32 value {} exceeds the bounds of f32",
+                                n
+                            )));
+                        }
+
                         if n_f32 as u32 != n {
                             return Err(Error::new(format!(
                                 "Cannot convert u32 number {} to f32 without loss of precision",
@@ -329,6 +337,13 @@ impl Deserialize for f32 {
                     }
                     Number::I32(n) => {
                         let n_f32 = n as f32;
+
+                        if n_f32.is_infinite() {
+                            return Err(Error::new(format!(
+                                "i32 value {} exceeds the bounds of f32",
+                                n
+                            )));
+                        }
 
                         if n_f32 as i32 != n {
                             return Err(Error::new(format!(
@@ -342,6 +357,13 @@ impl Deserialize for f32 {
                     Number::U64(n) => {
                         let n_f32 = n as f32;
 
+                        if n_f32.is_infinite() {
+                            return Err(Error::new(format!(
+                                "u64 value {} exceeds the bounds of f32",
+                                n
+                            )));
+                        }
+
                         if n_f32 as u64 != n {
                             return Err(Error::new(format!(
                                 "Cannot convert u64 number {} to f32 without loss of precision",
@@ -353,6 +375,13 @@ impl Deserialize for f32 {
                     }
                     Number::I64(n) => {
                         let n_f32 = n as f32;
+
+                        if n_f32.is_infinite() {
+                            return Err(Error::new(format!(
+                                "i64 value {} exceeds the bounds of f32",
+                                n
+                            )));
+                        }
 
                         if n_f32 as i64 != n {
                             return Err(Error::new(format!(
@@ -366,6 +395,13 @@ impl Deserialize for f32 {
                     Number::U128(n) => {
                         let n_f32 = n as f32;
 
+                        if n_f32.is_infinite() {
+                            return Err(Error::new(format!(
+                                "u128 value {} exceeds the bounds of f32",
+                                n
+                            )));
+                        }
+
                         if n_f32 as u128 != n {
                             return Err(Error::new(format!(
                                 "Cannot convert u128 number {} to f32 without loss of precision",
@@ -377,6 +413,13 @@ impl Deserialize for f32 {
                     }
                     Number::I128(n) => {
                         let n_f32 = n as f32;
+
+                        if n_f32.is_infinite() {
+                            return Err(Error::new(format!(
+                                "i128 value {} exceeds the bounds of f32",
+                                n
+                            )));
+                        }
 
                         if n_f32 as i128 != n {
                             return Err(Error::new(format!(
@@ -392,7 +435,7 @@ impl Deserialize for f32 {
 
                 Ok(n)
             }
-            _ => Err(Error::new("Expected number for f32")),
+            _ => Err(Error::new("Expected `f32` number")),
         }
     }
 }
@@ -428,6 +471,13 @@ impl Deserialize for f64 {
                     Number::U64(n) => {
                         let n_f64 = n as f64;
 
+                        if n_f64.is_infinite() {
+                            return Err(Error::new(format!(
+                                "u64 value {} exceeds the bounds of f64",
+                                n
+                            )));
+                        }
+
                         if n_f64 as u64 != n {
                             return Err(Error::new(format!(
                                 "Cannot convert u64 number {} to f64 without loss of precision",
@@ -439,6 +489,13 @@ impl Deserialize for f64 {
                     }
                     Number::I64(n) => {
                         let n_f64 = n as f64;
+
+                        if n_f64.is_infinite() {
+                            return Err(Error::new(format!(
+                                "i64 value {} exceeds the bounds of f64",
+                                n
+                            )));
+                        }
 
                         if n_f64 as i64 != n {
                             return Err(Error::new(format!(
@@ -452,6 +509,13 @@ impl Deserialize for f64 {
                     Number::U128(n) => {
                         let n_f64 = n as f64;
 
+                        if n_f64.is_infinite() {
+                            return Err(Error::new(format!(
+                                "u128 value {} exceeds the bounds of f64",
+                                n
+                            )));
+                        }
+
                         if n_f64 as u128 != n {
                             return Err(Error::new(format!(
                                 "Cannot convert u128 number {} to f64 without loss of precision",
@@ -463,6 +527,13 @@ impl Deserialize for f64 {
                     }
                     Number::I128(n) => {
                         let n_f64 = n as f64;
+
+                        if n_f64.is_infinite() {
+                            return Err(Error::new(format!(
+                                "i128 value {} exceeds the bounds of f64",
+                                n
+                            )));
+                        }
 
                         if n_f64 as i128 != n {
                             return Err(Error::new(format!(
@@ -478,7 +549,7 @@ impl Deserialize for f64 {
 
                 Ok(n)
             }
-            _ => Err(Error::new("Expected number for f64")),
+            _ => Err(Error::new("Expected `f64` number")),
         }
     }
 }
@@ -495,7 +566,7 @@ impl Deserialize for String {
     fn deserialize(value: Value) -> Result<Self> {
         match value {
             Value::Text(string) => Ok(string),
-            _ => Err(Error::new("Expected string")),
+            _ => Err(Error::new("Expected `string`")),
         }
     }
 }
@@ -526,12 +597,36 @@ impl<T: Deserialize> Deserialize for Vec<T> {
 
                 Ok(vec)
             }
-            _ => Err(Error::new("Expected array")),
+            _ => Err(Error::new("Expected `Vec` array")),
         }
     }
 }
 
 // -------------------------------- Tuple --------------------------------- //
+
+impl Serialize for () {
+    fn serialize(&self) -> Result<Value> {
+        Ok(Value::Tuple(Vec::new()))
+    }
+}
+
+impl Deserialize for () {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Tuple(tuple) => {
+                if tuple.len() != 0 {
+                    return Err(Error::new(format!(
+                        "Expected `empty` tuple, got tuple with {} members",
+                        tuple.len(),
+                    )));
+                }
+
+                Ok(())
+            }
+            _ => Err(Error::new("Expected `tuple`")),
+        }
+    }
+}
 
 impl_for_tuple!(T1);
 impl_for_tuple!(T1, T2);
@@ -572,7 +667,7 @@ impl<V: Deserialize> Deserialize for BTreeMap<String, V> {
 
                 Ok(map)
             }
-            _ => Err(Error::new("Expected object")),
+            _ => Err(Error::new("Expected `BTreeMap` object")),
         }
     }
 }
@@ -605,7 +700,7 @@ impl<V: Deserialize> Deserialize for std::collections::HashMap<String, V> {
 
                 Ok(map)
             }
-            _ => Err(Error::new("Expected object")),
+            _ => Err(Error::new("Expected `HashMap` object")),
         }
     }
 }
@@ -633,9 +728,9 @@ macro_rules! impl_for_struct {
 
         impl $crate::Serialize for $name {
             fn serialize(&self) -> $crate::internal::Result<$crate::internal::Value> {
-                let mut fields = $crate::internal::sys::Vec::with_capacity(
-                    [$(stringify!($field_name)),*].len()
-                );
+                const EXPECTED_LEN: usize = 0 $(+ { let _ = stringify!($field_name); 1 })*;
+
+                let mut fields = $crate::internal::sys::Vec::with_capacity(EXPECTED_LEN);
 
                 $(
                     fields.push(
@@ -746,7 +841,7 @@ macro_rules! impl_for_struct {
                         })
                     }
                     _ => Err($crate::internal::Error::new(
-                        format!("Expected struct for `{}`", stringify!($name))
+                        format!("Expected `{}` struct", stringify!($name))
                     ))
                 }
             }
