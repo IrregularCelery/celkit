@@ -553,6 +553,33 @@ impl Deserialize for f64 {
     }
 }
 
+// -------------------------------- char ---------------------------------- //
+
+impl Serialize for char {
+    fn serialize(&self) -> Result<Value> {
+        Ok(Value::Text(self.to_string()))
+    }
+}
+
+impl Deserialize for char {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Text(string) => {
+                let mut chars = string.chars();
+
+                match (chars.next(), chars.next()) {
+                    (Some(c), None) => Ok(c),
+                    (None, _) => Err(Error::new(
+                        "Expected `single` character, got an `empty` string",
+                    )),
+                    _ => Err(Error::new("Expected `single` character, got `long` text")),
+                }
+            }
+            _ => Err(Error::new("Expected `char`")),
+        }
+    }
+}
+
 // -------------------------------- &str ---------------------------------- //
 
 impl Serialize for &str {
