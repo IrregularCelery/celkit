@@ -27,70 +27,70 @@ macro_rules! impl_for_integer {
                         match number {
                             Number::U8(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert u8 number {} to {}",
+                                    "Cannot convert `u8` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I8(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert i8 number {} to {}",
+                                    "Cannot convert `i8` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::U16(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert u16 number {} to {}",
+                                    "Cannot convert `u16` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I16(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert i16 number {} to {}",
+                                    "Cannot convert `i16` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::U32(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert u32 number {} to {}",
+                                    "Cannot convert `u32` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I32(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert i32 number {} to {}",
+                                    "Cannot convert `i32` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::U64(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert u64 number {} to {}",
+                                    "Cannot convert `u64` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I64(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert i64 number {} to {}",
+                                    "Cannot convert `i64` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::U128(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert u128 number {} to {}",
+                                    "Cannot convert `u128` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
                             }),
                             Number::I128(n) => <$type>::try_from(n).map_err(|_| {
                                 Error::new(format!(
-                                    "Cannot convert i128 number {} to {}",
+                                    "Cannot convert `i128` number {} to `{}`",
                                     n,
                                     stringify!($type)
                                 ))
@@ -98,7 +98,7 @@ macro_rules! impl_for_integer {
                             Number::F32(n) => {
                                 if !n.is_finite() {
                                     return Err(Error::new(format!(
-                                        "Cannot convert non-finite f32 {} to integer type {}",
+                                        "Cannot convert non-finite `f32` {} to integer type `{}`",
                                         n,
                                         stringify!($type)
                                     )));
@@ -106,7 +106,7 @@ macro_rules! impl_for_integer {
 
                                 if n < <$type>::MIN as f32 || n > <$type>::MAX as f32 {
                                     return Err(Error::new(format!(
-                                        "f32 number {} exceeds the bounds of {}",
+                                        "`f32` number {} exceeds the bounds of {}",
                                         n,
                                         stringify!($type)
                                     )));
@@ -116,7 +116,7 @@ macro_rules! impl_for_integer {
 
                                 if n_int as f32 != n {
                                     return Err(Error::new(format!(
-                                        "Cannot convert f32 number {} to {} \
+                                        "Cannot convert `f32` number {} to `{}` \
                                          without loss of precision",
                                         n,
                                         stringify!($type)
@@ -128,7 +128,7 @@ macro_rules! impl_for_integer {
                             Number::F64(n) => {
                                 if !n.is_finite() {
                                     return Err(Error::new(format!(
-                                        "Cannot convert non-finite f64 {} to integer type {}",
+                                        "Cannot convert non-finite `f64` {} to integer type `{}`",
                                         n,
                                         stringify!($type)
                                     )));
@@ -136,7 +136,7 @@ macro_rules! impl_for_integer {
 
                                 if n < <$type>::MIN as f64 || n > <$type>::MAX as f64 {
                                     return Err(Error::new(format!(
-                                        "f64 number {} exceeds the bounds of {}",
+                                        "`f64` number {} exceeds the bounds of `{}`",
                                         n,
                                         stringify!($type)
                                     )));
@@ -146,7 +146,7 @@ macro_rules! impl_for_integer {
 
                                 if n_int as f64 != n {
                                     return Err(Error::new(format!(
-                                        "Cannot convert f64 number {} to {} \
+                                        "Cannot convert `f64` number {} to `{}` \
                                          without loss of precision",
                                         n,
                                         stringify!($type)
@@ -187,7 +187,7 @@ macro_rules! impl_for_tuple {
 
                         if tuple.len() != EXPECTED_LEN {
                             return Err(Error::new(format!(
-                                "Expected tuple with {} members, got {}",
+                                "Expected `tuple` with {} members, got {}",
                                 EXPECTED_LEN,
                                 tuple.len()
                             )));
@@ -307,14 +307,14 @@ impl Deserialize for f32 {
 
                 if number.is_finite() && number_f32.is_infinite() {
                     return Err(Error::new(format!(
-                        "f64 value {} exceeds the bounds of f32",
+                        "`f64` value {} exceeds the bounds of `f32`",
                         number
                     )));
                 }
 
                 if number != 0.0 && number_f32 == 0.0 {
                     return Err(Error::new(format!(
-                        "f64 value {} underflowed to zero for f32",
+                        "`f64` value {} underflowed to zero for `f32`",
                         number
                     )));
                 }
@@ -333,14 +333,14 @@ impl Deserialize for f32 {
 
                         if n_f32.is_infinite() {
                             return Err(Error::new(format!(
-                                "u32 value {} exceeds the bounds of f32",
+                                "`u32` value {} exceeds the bounds of `f32`",
                                 n
                             )));
                         }
 
                         if n_f32 as u32 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert u32 number {} to f32 without loss of precision",
+                                "Cannot convert `u32` number {} to `f32` without loss of precision",
                                 n,
                             )));
                         }
@@ -352,14 +352,14 @@ impl Deserialize for f32 {
 
                         if n_f32.is_infinite() {
                             return Err(Error::new(format!(
-                                "i32 value {} exceeds the bounds of f32",
+                                "`i32` value {} exceeds the bounds of `f32`",
                                 n
                             )));
                         }
 
                         if n_f32 as i32 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert i32 number {} to f32 without loss of precision",
+                                "Cannot convert `i32` number {} to `f32` without loss of precision",
                                 n,
                             )));
                         }
@@ -371,14 +371,14 @@ impl Deserialize for f32 {
 
                         if n_f32.is_infinite() {
                             return Err(Error::new(format!(
-                                "u64 value {} exceeds the bounds of f32",
+                                "`u64` value {} exceeds the bounds of `f32`",
                                 n
                             )));
                         }
 
                         if n_f32 as u64 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert u64 number {} to f32 without loss of precision",
+                                "Cannot convert `u64` number {} to `f32` without loss of precision",
                                 n,
                             )));
                         }
@@ -390,14 +390,14 @@ impl Deserialize for f32 {
 
                         if n_f32.is_infinite() {
                             return Err(Error::new(format!(
-                                "i64 value {} exceeds the bounds of f32",
+                                "`i64` value {} exceeds the bounds of `f32`",
                                 n
                             )));
                         }
 
                         if n_f32 as i64 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert i64 number {} to f32 without loss of precision",
+                                "Cannot convert `i64` number {} to `f32` without loss of precision",
                                 n,
                             )));
                         }
@@ -409,14 +409,14 @@ impl Deserialize for f32 {
 
                         if n_f32.is_infinite() {
                             return Err(Error::new(format!(
-                                "u128 value {} exceeds the bounds of f32",
+                                "`u128` value {} exceeds the bounds of `f32`",
                                 n
                             )));
                         }
 
                         if n_f32 as u128 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert u128 number {} to f32 without loss of precision",
+                                "Cannot convert `u128` number {} to `f32` without loss of precision",
                                 n,
                             )));
                         }
@@ -428,14 +428,14 @@ impl Deserialize for f32 {
 
                         if n_f32.is_infinite() {
                             return Err(Error::new(format!(
-                                "i128 value {} exceeds the bounds of f32",
+                                "`i128` value {} exceeds the bounds of `f32`",
                                 n
                             )));
                         }
 
                         if n_f32 as i128 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert i128 number {} to f32 without loss of precision",
+                                "Cannot convert `i128` number {} to `f32` without loss of precision",
                                 n,
                             )));
                         }
@@ -485,14 +485,14 @@ impl Deserialize for f64 {
 
                         if n_f64.is_infinite() {
                             return Err(Error::new(format!(
-                                "u64 value {} exceeds the bounds of f64",
+                                "`u64` value {} exceeds the bounds of `f64`",
                                 n
                             )));
                         }
 
                         if n_f64 as u64 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert u64 number {} to f64 without loss of precision",
+                                "Cannot convert `u64` number {} to `f64` without loss of precision",
                                 n,
                             )));
                         }
@@ -504,14 +504,14 @@ impl Deserialize for f64 {
 
                         if n_f64.is_infinite() {
                             return Err(Error::new(format!(
-                                "i64 value {} exceeds the bounds of f64",
+                                "`i64` value {} exceeds the bounds of `f64`",
                                 n
                             )));
                         }
 
                         if n_f64 as i64 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert i64 number {} to f64 without loss of precision",
+                                "Cannot convert `i64` number {} to `f64` without loss of precision",
                                 n,
                             )));
                         }
@@ -523,14 +523,14 @@ impl Deserialize for f64 {
 
                         if n_f64.is_infinite() {
                             return Err(Error::new(format!(
-                                "u128 value {} exceeds the bounds of f64",
+                                "`u128` value {} exceeds the bounds of `f64`",
                                 n
                             )));
                         }
 
                         if n_f64 as u128 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert u128 number {} to f64 without loss of precision",
+                                "Cannot convert `u128` number {} to `f64` without loss of precision",
                                 n,
                             )));
                         }
@@ -542,14 +542,14 @@ impl Deserialize for f64 {
 
                         if n_f64.is_infinite() {
                             return Err(Error::new(format!(
-                                "i128 value {} exceeds the bounds of f64",
+                                "`i128` value {} exceeds the bounds of `f64`",
                                 n
                             )));
                         }
 
                         if n_f64 as i128 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert i128 number {} to f64 without loss of precision",
+                                "Cannot convert `i128` number {} to `f64` without loss of precision",
                                 n,
                             )));
                         }
@@ -756,14 +756,14 @@ impl<V: Deserialize> Deserialize for std::collections::HashMap<String, V> {
 
 impl<T: Serialize, E: Serialize> Serialize for core::result::Result<T, E> {
     fn serialize(&self) -> Result<Value> {
-        let mut result = BTreeMap::new();
+        let mut values = BTreeMap::new();
 
         match self {
-            Ok(value) => result.insert("Ok".to_string(), value.serialize()?),
-            Err(error) => result.insert("Err".to_string(), error.serialize()?),
+            Ok(value) => values.insert("Ok".to_string(), value.serialize()?),
+            Err(error) => values.insert("Err".to_string(), error.serialize()?),
         };
 
-        Ok(Value::Object(result))
+        Ok(Value::Object(values))
     }
 }
 
@@ -790,6 +790,221 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
                 ))
             }
             _ => Err(Error::new("Expected `Result` object")),
+        }
+    }
+}
+
+// ------------------------------ Duration -------------------------------- //
+
+#[cfg(feature = "std")]
+impl Serialize for std::time::Duration {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = BTreeMap::new();
+
+        values.insert(
+            "secs".to_string(),
+            Value::Number(Number::U64(self.as_secs())),
+        );
+        values.insert(
+            "nanos".to_string(),
+            Value::Number(Number::U32(self.subsec_nanos())),
+        );
+
+        Ok(Value::Object(values))
+    }
+}
+
+#[cfg(feature = "std")]
+impl Deserialize for std::time::Duration {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Object(mut object) => {
+                if object.len() != 2 {
+                    return Err(Error::new(
+                        "Expected `Duration` object with exactly two entries (`secs` and `nanos`)",
+                    ));
+                }
+
+                let secs = match object.remove("secs") {
+                    Some(Value::Number(number)) => match number {
+                        Number::U8(n) => n as u64,
+                        Number::I8(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i8` number {} to `u64` for `secs`",
+                                n,
+                            ))
+                        })?,
+                        Number::U16(n) => n as u64,
+                        Number::I16(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i16` number {} to `u64` for `secs`",
+                                n,
+                            ))
+                        })?,
+                        Number::U32(n) => n as u64,
+                        Number::I32(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i32` number {} to `u64` for `secs`",
+                                n,
+                            ))
+                        })?,
+                        Number::U64(n) => n,
+                        Number::I64(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i64` number {} to `u64` for `secs`",
+                                n,
+                            ))
+                        })?,
+                        Number::U128(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `u128` number {} to `u64` for `secs`",
+                                n,
+                            ))
+                        })?,
+                        Number::I128(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i128` number {} to `u64` for `secs`",
+                                n,
+                            ))
+                        })?,
+                        Number::F32(n) => {
+                            if n < 0.0 || n.is_infinite() || n.is_nan() {
+                                return Err(Error::new(format!(
+                                    "`secs` must be a finite non-negative number: {}",
+                                    n
+                                )));
+                            }
+
+                            if n > u64::MAX as f32 {
+                                return Err(Error::new(format!(
+                                    "`secs` exceeds the bounds for `Duration`: {}",
+                                    n
+                                )));
+                            }
+
+                            n as u64
+                        }
+                        Number::F64(n) => {
+                            if n < 0.0 || n.is_infinite() || n.is_nan() {
+                                return Err(Error::new(format!(
+                                    "`secs` must be a finite non-negative number: {}",
+                                    n
+                                )));
+                            }
+
+                            if n > u64::MAX as f64 {
+                                return Err(Error::new(format!(
+                                    "`secs` exceeds the bounds for `Duration`: {}",
+                                    n
+                                )));
+                            }
+
+                            n as u64
+                        }
+                    },
+                    _ => {
+                        return Err(Error::new(
+                            "Expected `Duration` object with a valid numeric `secs` entry",
+                        ))
+                    }
+                };
+
+                let nanos = match object.remove("nanos") {
+                    Some(Value::Number(number)) => match number {
+                        Number::U8(n) => n as u32,
+                        Number::I8(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i8` number {} to `u32` for `nanos`",
+                                n,
+                            ))
+                        })?,
+                        Number::U16(n) => n as u32,
+                        Number::I16(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i16` number {} to `u32` for `nanos`",
+                                n,
+                            ))
+                        })?,
+                        Number::U32(n) => n,
+                        Number::I32(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i32` number {} to `u32` for `nanos`",
+                                n,
+                            ))
+                        })?,
+                        Number::U64(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `u64` number {} to `u32` for `nanos`",
+                                n,
+                            ))
+                        })?,
+                        Number::I64(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i64` number {} to `u32` for `nanos`",
+                                n,
+                            ))
+                        })?,
+                        Number::U128(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `u128` number {} to `u32` for `nanos`",
+                                n,
+                            ))
+                        })?,
+                        Number::I128(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `i128` number {} to `u32` for `nanos`",
+                                n,
+                            ))
+                        })?,
+                        Number::F32(n) => {
+                            if n < 0.0 || n.is_infinite() || n.is_nan() {
+                                return Err(Error::new(format!(
+                                    "`nanos` must be a finite non-negative number: {}",
+                                    n
+                                )));
+                            }
+
+                            if n > u32::MAX as f32 {
+                                return Err(Error::new(format!(
+                                    "`nanos` exceeds the bounds for `Duration`: {}",
+                                    n
+                                )));
+                            }
+
+                            n as u32
+                        }
+                        Number::F64(n) => {
+                            if n < 0.0 || n.is_infinite() || n.is_nan() {
+                                return Err(Error::new(format!(
+                                    "`nanos` must be a finite non-negative number: {}",
+                                    n
+                                )));
+                            }
+
+                            if n > u32::MAX as f64 {
+                                return Err(Error::new(format!(
+                                    "`nanos` exceeds the bounds for `Duration`: {}",
+                                    n
+                                )));
+                            }
+
+                            n as u32
+                        }
+                    },
+                    _ => {
+                        return Err(Error::new(
+                            "Expected `Duration` object with a valid numeric `nanos` entry",
+                        ))
+                    }
+                };
+
+                if nanos >= 1_000_000_000 {
+                    return Err(Error::new("`nanos` must be less than 1,000,000,000"));
+                }
+
+                Ok(std::time::Duration::new(secs, nanos))
+            }
+            _ => Err(Error::new("Expected `Duration` object")),
         }
     }
 }
