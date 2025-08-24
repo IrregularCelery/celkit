@@ -2,7 +2,6 @@
 //       - Array slice
 //       - More std stuff
 //       - Enum
-//       - Box
 //       - Rc/Arc
 
 use crate::core::{Deserialize, Serialize};
@@ -749,6 +748,48 @@ impl<V: Deserialize> Deserialize for std::collections::HashMap<String, V> {
                 Ok(map)
             }
             _ => Err(Error::new("Expected `HashMap` object")),
+        }
+    }
+}
+
+// ------------------------------- Result --------------------------------- //
+
+impl<T: Serialize, E: Serialize> Serialize for core::result::Result<T, E> {
+    fn serialize(&self) -> Result<Value> {
+        let mut result = BTreeMap::new();
+
+        match self {
+            Ok(value) => result.insert("Ok".to_string(), value.serialize()?),
+            Err(error) => result.insert("Err".to_string(), error.serialize()?),
+        };
+
+        Ok(Value::Object(result))
+    }
+}
+
+impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Object(mut object) => {
+                if object.len() > 1 {
+                    return Err(Error::new(
+                        "Expected `Result` object with exactly one entry (`Ok` or `Err`)",
+                    ));
+                }
+
+                if let Some(ok) = object.remove("Ok") {
+                    return Ok(Ok(T::deserialize(ok)?));
+                }
+
+                if let Some(err) = object.remove("Err") {
+                    return Ok(Err(E::deserialize(err)?));
+                }
+
+                Err(Error::new(
+                    "Expected `Result` object with `Ok` or `Err` entry",
+                ))
+            }
+            _ => Err(Error::new("Expected `Result` object")),
         }
     }
 }
