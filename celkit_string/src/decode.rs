@@ -786,7 +786,7 @@ impl Decoder {
     }
 }
 
-pub fn from_string<T: celkit_core::Deserialize>(text: &str) -> celkit_core::internal::Result<T> {
+pub fn from_str<T: celkit_core::Deserialize>(text: &str) -> celkit_core::internal::Result<T> {
     let deserialized = Decoder::new(text).decode()?;
 
     T::deserialize(deserialized)

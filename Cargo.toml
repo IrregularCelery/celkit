@@ -4,6 +4,7 @@ members = [
   "celkit",
   "celkit_core",
   "celkit_string",
+  "celkit_derive",
 ]
 
 [workspace.package]

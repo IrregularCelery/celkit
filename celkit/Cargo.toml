@@ -12,7 +12,9 @@ std = [
   "celkit-string?/std",
 ]
 string = ["celkit-string"]
+derive = ["celkit-derive"]
 
 [dependencies]
 celkit-core = { path = "../celkit_core/" }
 celkit-string = { path = "../celkit_string/", optional = true }
+celkit-derive = { path = "../celkit_derive/", optional = true }
