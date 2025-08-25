@@ -336,29 +336,23 @@ mod pretty {
 
                 items.push(encoded_item);
 
-                if can_fit_single_line {
-                    single_line_length += items[i].len();
+                single_line_length += items[i].len();
 
-                    if i < value.len() - 1 {
-                        single_line_length += 2; // Separator and space
-                    }
+                if i < value.len() - 1 {
+                    single_line_length += 2; // Separator and space
                 }
             }
 
-            if can_fit_single_line {
-                single_line_length += 1; // ArrayClose
+            single_line_length += 1; // ArrayClose
 
-                // It's safe to assume this value is a child (nested) element if
-                // the `depth` is non-zero. So, we add `1` to the length of the line
-                // to account for a possible comma from the parent.
-                let comma_allowance = if depth > 0 { 1 } else { 0 };
+            // It's safe to assume this value is a child (nested) element if
+            // the `depth` is non-zero. So, we add `1` to the length of the line
+            // to account for a possible comma from the parent.
+            let comma_allowance = if depth > 0 { 1 } else { 0 };
 
-                // Check if it exceeded the line limit
-                if current_indent.len() + single_line_length + comma_allowance
-                    > self.max_line_length
-                {
-                    can_fit_single_line = false;
-                }
+            // Check if it exceeded the line limit
+            if current_indent.len() + single_line_length + comma_allowance > self.max_line_length {
+                can_fit_single_line = false;
             }
 
             if can_fit_single_line {
@@ -430,29 +424,23 @@ mod pretty {
 
                 members.push(encoded_member);
 
-                if can_fit_single_line {
-                    single_line_length += members[i].len();
+                single_line_length += members[i].len();
 
-                    if i < value.len() - 1 {
-                        single_line_length += 2; // Separator and space
-                    }
+                if i < value.len() - 1 {
+                    single_line_length += 2; // Separator and space
                 }
             }
 
-            if can_fit_single_line {
-                single_line_length += 1; // TupleClose
+            single_line_length += 1; // TupleClose
 
-                // It's safe to assume this value is a child (nested) element if
-                // the `depth` is non-zero. So, we add `1` to the length of the line
-                // to account for a possible comma from the parent.
-                let comma_allowance = if depth > 0 { 1 } else { 0 };
+            // It's safe to assume this value is a child (nested) element if
+            // the `depth` is non-zero. So, we add `1` to the length of the line
+            // to account for a possible comma from the parent.
+            let comma_allowance = if depth > 0 { 1 } else { 0 };
 
-                // Check if it exceeded the line limit
-                if current_indent.len() + single_line_length + comma_allowance
-                    > self.max_line_length
-                {
-                    can_fit_single_line = false;
-                }
+            // Check if it exceeded the line limit
+            if current_indent.len() + single_line_length + comma_allowance > self.max_line_length {
+                can_fit_single_line = false;
             }
 
             if can_fit_single_line {
@@ -529,29 +517,23 @@ mod pretty {
 
                 entries.push(encoded_entry);
 
-                if can_fit_single_line {
-                    single_line_length += entries[i].len();
+                single_line_length += entries[i].len();
 
-                    if i < value.len() - 1 {
-                        single_line_length += 2; // Separator and space
-                    }
+                if i < value.len() - 1 {
+                    single_line_length += 2; // Separator and space
                 }
             }
 
-            if can_fit_single_line {
-                single_line_length += 1; // ObjectClose
+            single_line_length += 1; // ObjectClose
 
-                // It's safe to assume this value is a child (nested) element if
-                // the `depth` is non-zero. So, we add `1` to the length of the line
-                // to account for a possible comma from the parent.
-                let comma_allowance = if depth > 0 { 1 } else { 0 };
+            // It's safe to assume this value is a child (nested) element if
+            // the `depth` is non-zero. So, we add `1` to the length of the line
+            // to account for a possible comma from the parent.
+            let comma_allowance = if depth > 0 { 1 } else { 0 };
 
-                // Check if it exceeded the line limit
-                if current_indent.len() + single_line_length + comma_allowance
-                    > self.max_line_length
-                {
-                    can_fit_single_line = false;
-                }
+            // Check if it exceeded the line limit
+            if current_indent.len() + single_line_length + comma_allowance > self.max_line_length {
+                can_fit_single_line = false;
             }
 
             if can_fit_single_line {
