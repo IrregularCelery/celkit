@@ -1,5 +1,4 @@
 // TODO: Add implementations for these as well:
-//       - Array slice
 //       - More std stuff
 //       - Enum
 //       - Rc/Arc
@@ -615,6 +614,60 @@ impl Deserialize for String {
             Value::Text(string) => Ok(string),
             _ => Err(Error::new("Expected `string`")),
         }
+    }
+}
+
+// -------------------------- Fixed-size Array ---------------------------- //
+
+impl<T: Serialize, const N: usize> Serialize for [T; N] {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = Vec::with_capacity(N);
+
+        for item in self {
+            values.push(item.serialize()?);
+        }
+
+        Ok(Value::Array(values))
+    }
+}
+
+impl<T: Deserialize, const N: usize> Deserialize for [T; N] {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Array(array) => {
+                if array.len() != N {
+                    return Err(Error::new(format!(
+                        "Expected fixed-size `array` of {}, got {}",
+                        N,
+                        array.len()
+                    )));
+                }
+
+                let vec: Vec<T> = array
+                    .into_iter()
+                    .map(T::deserialize)
+                    .collect::<Result<Vec<T>>>()?;
+
+                vec.try_into().map_err(|_| {
+                    Error::new(format!("Failed to convert `Vec` to `array` of size {}", N))
+                })
+            }
+            _ => Err(Error::new("Expected `Fixed-size` array")),
+        }
+    }
+}
+
+// -------------------------------- Slice --------------------------------- //
+
+impl<T: Serialize> Serialize for &[T] {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = Vec::with_capacity(self.len());
+
+        for item in *self {
+            values.push(item.serialize()?);
+        }
+
+        Ok(Value::Array(values))
     }
 }
 
