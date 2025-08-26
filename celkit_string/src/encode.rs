@@ -247,8 +247,9 @@ mod pretty {
 
         pub fn encode(self) -> Result<String> {
             let depth = 0;
+            let available_line_length = None;
 
-            self.encode_value(&self.input, depth)
+            self.encode_value(&self.input, depth, available_line_length)
         }
 
         fn indent(&self, level: usize) -> String {
@@ -321,7 +322,12 @@ mod pretty {
             Ok(format!("\"{}\"", escape_text(value)))
         }
 
-        fn encode_array(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
+        fn encode_array(
+            &self,
+            value: &Vec<Value>,
+            depth: usize,
+            available_line_length: Option<usize>,
+        ) -> Result<String> {
             if value.is_empty() {
                 return Ok(format!("{}{}", Token::ArrayOpen, Token::ArrayClose));
             }
@@ -340,7 +346,7 @@ mod pretty {
                     has_struct_item = true;
                 }
 
-                let encoded_item = self.encode_value(item, depth + 1)?;
+                let encoded_item = self.encode_value(item, depth + 1, None)?;
 
                 items.push(encoded_item);
 
@@ -358,10 +364,11 @@ mod pretty {
             // to account for a possible comma from the parent.
             let comma_allowance = if depth > 0 { 1 } else { 0 };
 
+            let default_max_length = self.max_line_length - current_indent.len() - comma_allowance;
+            let single_line_max_length = available_line_length.unwrap_or(default_max_length);
+
             // Check if it exceeded the line limit
-            let can_fit_single_line =
-                !(current_indent.len() + single_line_length + comma_allowance
-                    > self.max_line_length);
+            let can_fit_single_line = single_line_length <= single_line_max_length;
 
             if can_fit_single_line && !has_struct_item {
                 return Ok(format!(
@@ -439,7 +446,12 @@ mod pretty {
             Ok(output)
         }
 
-        fn encode_tuple(&self, value: &Vec<Value>, depth: usize) -> Result<String> {
+        fn encode_tuple(
+            &self,
+            value: &Vec<Value>,
+            depth: usize,
+            available_line_length: Option<usize>,
+        ) -> Result<String> {
             if value.is_empty() {
                 return Ok(format!("{}{}", Token::TupleOpen, Token::TupleClose));
             }
@@ -458,7 +470,7 @@ mod pretty {
                     has_struct_member = true;
                 }
 
-                let encoded_member = self.encode_value(member, depth + 1)?;
+                let encoded_member = self.encode_value(member, depth + 1, None)?;
 
                 members.push(encoded_member);
 
@@ -476,10 +488,11 @@ mod pretty {
             // to account for a possible comma from the parent.
             let comma_allowance = if depth > 0 { 1 } else { 0 };
 
+            let default_max_length = self.max_line_length - current_indent.len() - comma_allowance;
+            let single_line_max_length = available_line_length.unwrap_or(default_max_length);
+
             // Check if it exceeded the line limit
-            let can_fit_single_line =
-                !(current_indent.len() + single_line_length + comma_allowance
-                    > self.max_line_length);
+            let can_fit_single_line = single_line_length <= single_line_max_length;
 
             if can_fit_single_line && !has_struct_member {
                 return Ok(format!(
@@ -557,7 +570,12 @@ mod pretty {
             Ok(output)
         }
 
-        fn encode_object(&self, value: &BTreeMap<String, Value>, depth: usize) -> Result<String> {
+        fn encode_object(
+            &self,
+            value: &BTreeMap<String, Value>,
+            depth: usize,
+            available_line_length: Option<usize>,
+        ) -> Result<String> {
             if value.is_empty() {
                 return Ok(format!("{}{}", Token::ObjectOpen, Token::ObjectClose));
             }
@@ -576,11 +594,18 @@ mod pretty {
                     has_struct_entry = true;
                 }
 
+                let key_length = entry.0.len() + 4; // 2 double quotations + KeyAssign + space
+
+                let available_length = self
+                    .max_line_length
+                    .saturating_sub(next_indent.len())
+                    .saturating_sub(key_length);
+
                 let encoded_entry = format!(
                     "\"{}\"{} {}",
                     escape_text(entry.0), // Entry key
                     Token::KeyAssign,
-                    self.encode_value(entry.1, depth + 1)? // Entry value
+                    self.encode_value(entry.1, depth + 1, Some(available_length))? // Entry value
                 );
 
                 entries.push(encoded_entry);
@@ -599,10 +624,11 @@ mod pretty {
             // to account for a possible comma from the parent.
             let comma_allowance = if depth > 0 { 1 } else { 0 };
 
+            let default_max_length = self.max_line_length - current_indent.len() - comma_allowance;
+            let single_line_max_length = available_line_length.unwrap_or(default_max_length);
+
             // Check if it exceeded the line limit
-            let can_fit_single_line =
-                !(current_indent.len() + single_line_length + comma_allowance
-                    > self.max_line_length);
+            let can_fit_single_line = single_line_length <= single_line_max_length;
 
             if can_fit_single_line && !has_struct_entry {
                 return Ok(format!(
@@ -680,7 +706,12 @@ mod pretty {
             Ok(output)
         }
 
-        fn encode_struct(&self, value: &Vec<(String, Value)>, depth: usize) -> Result<String> {
+        fn encode_struct(
+            &self,
+            value: &Vec<(String, Value)>,
+            depth: usize,
+            _available_line_length: Option<usize>,
+        ) -> Result<String> {
             if value.is_empty() {
                 return Ok(format!(
                     "{}{}{}",
@@ -696,11 +727,18 @@ mod pretty {
             let fields: Result<Vec<String>> = value
                 .iter()
                 .map(|field| {
+                    let key_length = field.0.len() + 3; // FieldAssign + 2 spaces
+
+                    let available_length = self
+                        .max_line_length
+                        .saturating_sub(next_indent.len())
+                        .saturating_sub(key_length);
+
                     Ok(format!(
                         "{} {} {}",
                         field.0, // Field name
                         Token::FieldAssign,
-                        self.encode_value(&field.1, depth + 1)? // Field value
+                        self.encode_value(&field.1, depth + 1, Some(available_length))? // Field value
                     ))
                 })
                 .collect();
@@ -738,16 +776,21 @@ mod pretty {
             Ok(output)
         }
 
-        fn encode_value(&self, value: &Value, depth: usize) -> Result<String> {
+        fn encode_value(
+            &self,
+            value: &Value,
+            depth: usize,
+            available_line_length: Option<usize>,
+        ) -> Result<String> {
             match value {
                 Value::Null => self.encode_null(),
                 Value::Boolean(b) => self.encode_boolean(b),
                 Value::Number(n) => self.encode_number(n),
                 Value::Text(t) => self.encode_text(t),
-                Value::Array(a) => self.encode_array(a, depth),
-                Value::Tuple(t) => self.encode_tuple(t, depth),
-                Value::Object(o) => self.encode_object(o, depth),
-                Value::Struct(s) => self.encode_struct(s, depth),
+                Value::Array(a) => self.encode_array(a, depth, available_line_length),
+                Value::Tuple(t) => self.encode_tuple(t, depth, available_line_length),
+                Value::Object(o) => self.encode_object(o, depth, available_line_length),
+                Value::Struct(s) => self.encode_struct(s, depth, available_line_length),
             }
         }
     }

@@ -1,6 +1,3 @@
-// TODO: Look into the bug that doesn't count the keys in objects for the max length
-// TODO: Fix a bug with arrays and objects that if they have a low amount of small structs,
-// the format look weird because of not wrapping to the next line
 use celkit_core::internal::sys::*;
 use celkit_core::internal::Number;
 
