@@ -444,7 +444,7 @@ impl Decoder {
         }
     }
 
-    fn find_identifier_or_keyword(&mut self) -> Result<Token> {
+    fn find_identifier_or_keyword(&mut self, expected_identifier: bool) -> Result<Token> {
         let start = self.position;
 
         // Handle raw identifier (r#keyword)
@@ -471,6 +471,10 @@ impl Decoder {
         let identifier: String = self.input[start..self.position].iter().collect();
         let identifier = identifier.to_lowercase();
 
+        if expected_identifier {
+            return Ok(Token::Identifier(identifier));
+        }
+
         match identifier.as_str() {
             "inf" => Ok(Token::Numeric(Number::F64(f64::INFINITY))),
             "nan" => Ok(Token::Numeric(Number::F64(f64::NAN))),
@@ -481,16 +485,20 @@ impl Decoder {
         }
     }
 
-    fn next_token(&mut self) -> Result<Token> {
+    fn next_token_with_context(&mut self, expected_value: bool) -> Result<Token> {
         self.skip_comment_and_whitespace()?;
 
         match self.current_char {
             None => Ok(Token::Eof),
             Some('"') => self.find_literal(),
             Some(c) if c.is_ascii_digit() || c == '+' || c == '-' => self.find_numeric(),
-            Some(c) if c.is_alphabetic() => self.find_identifier_or_keyword(),
+            Some(c) if c.is_alphabetic() => self.find_identifier_or_keyword(!expected_value),
             Some(c) => self.find_char(c),
         }
+    }
+
+    fn next_token(&mut self) -> Result<Token> {
+        self.next_token_with_context(true)
     }
 
     fn expect_token(&mut self, expected: Token, context: &str) -> Result<()> {
@@ -543,7 +551,8 @@ impl Decoder {
             }
 
             // Decode field
-            let token = self.next_token()?;
+            // Next token must be an identifier
+            let token = self.next_token_with_context(false)?;
 
             match token {
                 Token::Identifier(i /* Field name */) => {
