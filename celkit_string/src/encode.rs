@@ -1,5 +1,3 @@
-// TODO: Add support for reserved indentifers such as: nan, inf, etc. Rust-reserved ones as well.
-
 use celkit_core::internal::sys::*;
 
 fn escape_text(input: &str) -> String {
@@ -91,7 +89,10 @@ mod mini {
                     let abs_n = if *n < 0.0 { -*n } else { *n };
 
                     // For the minified version we almost always use the exponent notation
-                    if abs_n > 1e4 || (abs_n <= 1e-4 && abs_n > 0.0) {
+                    let upper_threshold = 1e4;
+                    let lower_threshold = 1e-4;
+
+                    if abs_n > upper_threshold || (abs_n <= lower_threshold && abs_n > 0.0) {
                         return Ok(format!("{:e}", n));
                     }
 
@@ -290,7 +291,10 @@ mod pretty {
                     let abs_n = if *n < 0.0 { -*n } else { *n };
 
                     // Use exponent notation for very large or very small numbers
-                    if abs_n > 1e15 || (abs_n < 1e-5 && abs_n > 0.0) {
+                    let upper_threshold = 1e15;
+                    let lower_threshold = 1e-5;
+
+                    if abs_n > upper_threshold || (abs_n < lower_threshold && abs_n > 0.0) {
                         return Ok(format!("{:e}", n));
                     }
 
@@ -327,11 +331,15 @@ mod pretty {
 
             let mut items = Vec::new();
             let mut single_line_length = 0;
-            let mut can_fit_single_line = true;
+            let mut has_struct_item = false;
 
             single_line_length += 1; // ArrayOpen
 
             for (i, item) in value.iter().enumerate() {
+                if !has_struct_item && matches!(item, Value::Struct(_)) {
+                    has_struct_item = true;
+                }
+
                 let encoded_item = self.encode_value(item, depth + 1)?;
 
                 items.push(encoded_item);
@@ -351,11 +359,11 @@ mod pretty {
             let comma_allowance = if depth > 0 { 1 } else { 0 };
 
             // Check if it exceeded the line limit
-            if current_indent.len() + single_line_length + comma_allowance > self.max_line_length {
-                can_fit_single_line = false;
-            }
+            let can_fit_single_line =
+                !(current_indent.len() + single_line_length + comma_allowance
+                    > self.max_line_length);
 
-            if can_fit_single_line {
+            if can_fit_single_line && !has_struct_item {
                 return Ok(format!(
                     "{}{}{}",
                     Token::ArrayOpen,
@@ -364,11 +372,37 @@ mod pretty {
                 ));
             }
 
+            if has_struct_item {
+                // Each item has its own line
+
+                let mut output = String::new();
+
+                output.push_str(&Token::ArrayOpen.to_string());
+                output.push('\n');
+
+                for (i, encoded_item) in items.into_iter().enumerate() {
+                    let mut formatted_item = encoded_item;
+
+                    if i < value.len() - 1 || self.trailing_comma {
+                        formatted_item.push_str(&format!("{}", Token::Separator));
+                    }
+
+                    output.push_str(&format!("{}{}", next_indent, formatted_item.trim_end()));
+                    output.push('\n');
+                }
+
+                output.push_str(&current_indent);
+                output.push_str(&Token::ArrayClose.to_string());
+
+                return Ok(output);
+            }
+
             let mut output = String::new();
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str(&format!("{}\n", Token::ArrayOpen));
+            output.push_str(&Token::ArrayOpen.to_string());
+            output.push('\n');
 
             for (i, encoded_item) in items.into_iter().enumerate() {
                 let mut formatted_item = encoded_item;
@@ -415,11 +449,15 @@ mod pretty {
 
             let mut members = Vec::new();
             let mut single_line_length = 0;
-            let mut can_fit_single_line = true;
+            let mut has_struct_member = false;
 
             single_line_length += 1; // TupleOpen
 
             for (i, member) in value.iter().enumerate() {
+                if matches!(member, Value::Struct(_)) {
+                    has_struct_member = true;
+                }
+
                 let encoded_member = self.encode_value(member, depth + 1)?;
 
                 members.push(encoded_member);
@@ -439,11 +477,11 @@ mod pretty {
             let comma_allowance = if depth > 0 { 1 } else { 0 };
 
             // Check if it exceeded the line limit
-            if current_indent.len() + single_line_length + comma_allowance > self.max_line_length {
-                can_fit_single_line = false;
-            }
+            let can_fit_single_line =
+                !(current_indent.len() + single_line_length + comma_allowance
+                    > self.max_line_length);
 
-            if can_fit_single_line {
+            if can_fit_single_line && !has_struct_member {
                 return Ok(format!(
                     "{}{}{}",
                     Token::TupleOpen,
@@ -452,11 +490,37 @@ mod pretty {
                 ));
             }
 
+            if has_struct_member {
+                // Each member has its own line
+
+                let mut output = String::new();
+
+                output.push_str(&Token::TupleOpen.to_string());
+                output.push('\n');
+
+                for (i, encoded_member) in members.into_iter().enumerate() {
+                    let mut formatted_member = encoded_member;
+
+                    if i < value.len() - 1 || self.trailing_comma {
+                        formatted_member.push_str(&format!("{}", Token::Separator));
+                    }
+
+                    output.push_str(&format!("{}{}", next_indent, formatted_member.trim_end()));
+                    output.push('\n');
+                }
+
+                output.push_str(&current_indent);
+                output.push_str(&Token::TupleClose.to_string());
+
+                return Ok(output);
+            }
+
             let mut output = String::new();
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str(&format!("{}\n", Token::TupleOpen));
+            output.push_str(&Token::TupleOpen.to_string());
+            output.push('\n');
 
             for (i, encoded_member) in members.into_iter().enumerate() {
                 let mut formatted_member = encoded_member;
@@ -503,11 +567,15 @@ mod pretty {
 
             let mut entries = Vec::new();
             let mut single_line_length = 0;
-            let mut can_fit_single_line = true;
+            let mut has_struct_entry = false;
 
             single_line_length += 1; // ObjectOpen
 
             for (i, entry) in value.iter().enumerate() {
+                if !has_struct_entry && matches!(entry.1, Value::Struct(_)) {
+                    has_struct_entry = true;
+                }
+
                 let encoded_entry = format!(
                     "\"{}\"{} {}",
                     escape_text(entry.0), // Entry key
@@ -532,11 +600,11 @@ mod pretty {
             let comma_allowance = if depth > 0 { 1 } else { 0 };
 
             // Check if it exceeded the line limit
-            if current_indent.len() + single_line_length + comma_allowance > self.max_line_length {
-                can_fit_single_line = false;
-            }
+            let can_fit_single_line =
+                !(current_indent.len() + single_line_length + comma_allowance
+                    > self.max_line_length);
 
-            if can_fit_single_line {
+            if can_fit_single_line && !has_struct_entry {
                 return Ok(format!(
                     "{}{}{}",
                     Token::ObjectOpen,
@@ -545,11 +613,37 @@ mod pretty {
                 ));
             }
 
+            if has_struct_entry {
+                // Each entry has its own line
+
+                let mut output = String::new();
+
+                output.push_str(&Token::ObjectOpen.to_string());
+                output.push('\n');
+
+                for (i, encoded_entry) in entries.into_iter().enumerate() {
+                    let mut formatted_entry = encoded_entry;
+
+                    if i < value.len() - 1 || self.trailing_comma {
+                        formatted_entry.push_str(&format!("{}", Token::Separator));
+                    }
+
+                    output.push_str(&format!("{}{}", next_indent, formatted_entry.trim_end()));
+                    output.push('\n');
+                }
+
+                output.push_str(&current_indent);
+                output.push_str(&Token::ObjectClose.to_string());
+
+                return Ok(output);
+            }
+
             let mut output = String::new();
             let mut current_line = next_indent.clone();
             let empty_line_len = next_indent.len();
 
-            output.push_str(&format!("{}\n", Token::ObjectOpen));
+            output.push_str(&Token::ObjectOpen.to_string());
+            output.push('\n');
 
             for (i, encoded_entry) in entries.into_iter().enumerate() {
                 let mut formatted_entry = encoded_entry;
