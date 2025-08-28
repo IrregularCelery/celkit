@@ -1,14 +1,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-pub mod traits {
-    pub use celkit_core::{Deserialize, Serialize};
-}
+pub use celkit_core::{Deserialize, Serialize};
 
 pub mod core {
     pub use celkit_core::internal::sys::*;
     pub use celkit_core::internal::utils;
     pub use celkit_core::internal::{Error, Result, Value};
-    pub use celkit_core::{Deserialize, Serialize};
 }
 
 #[cfg(feature = "string")]

@@ -59,7 +59,7 @@ fn generate_named_fields_struct_serialize(
     });
 
     quote::quote! {
-        impl ::celkit::core::Serialize for #name {
+        impl ::celkit::Serialize for #name {
             fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
                 use ::celkit::core::*;
 
@@ -87,7 +87,7 @@ fn generate_unnamed_fields_struct_serialize(
     });
 
     quote::quote! {
-        impl ::celkit::core::Serialize for #name {
+        impl ::celkit::Serialize for #name {
             fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
                 use ::celkit::core::*;
 
@@ -104,7 +104,7 @@ fn generate_unnamed_fields_struct_serialize(
 
 fn generate_unit_fields_struct_serialize(name: &syn::Ident) -> proc_macro2::TokenStream {
     quote::quote! {
-        impl ::celkit::core::Serialize for #name {
+        impl ::celkit::Serialize for #name {
             fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
                 use ::celkit::core::*;
 
@@ -141,7 +141,7 @@ fn generate_named_fields_struct_deserialize(
 
     if field_names.is_empty() {
         return quote::quote! {
-            impl ::celkit::core::Deserialize for #name {
+            impl ::celkit::Deserialize for #name {
                 fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                     match value {
                         ::celkit::core::Value::Struct(fields) if fields.is_empty() => Ok(#name {}),
@@ -222,7 +222,7 @@ fn generate_named_fields_struct_deserialize(
     };
 
     quote::quote! {
-        impl ::celkit::core::Deserialize for #name {
+        impl ::celkit::Deserialize for #name {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
                     ::celkit::core::Value::Struct(fields) => {
@@ -303,7 +303,7 @@ fn generate_unnamed_fields_struct_deserialize(
         .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()));
 
     quote::quote! {
-        impl ::celkit::core::Deserialize for #name {
+        impl ::celkit::Deserialize for #name {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
                     ::celkit::core::Value::Tuple(fields) => {
@@ -334,7 +334,7 @@ fn generate_unnamed_fields_struct_deserialize(
 
 fn generate_unit_fields_struct_deserialize(name: &syn::Ident) -> proc_macro2::TokenStream {
     quote::quote! {
-        impl ::celkit::core::Deserialize for #name {
+        impl ::celkit::Deserialize for #name {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
                     ::celkit::core::Value::Struct(fields) if fields.is_empty() => Ok(#name),
