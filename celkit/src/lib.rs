@@ -4,9 +4,19 @@ pub mod traits {
     pub use celkit_core::{Deserialize, Serialize};
 }
 
+pub mod core {
+    pub use celkit_core::internal::sys::*;
+    pub use celkit_core::internal::utils;
+    pub use celkit_core::internal::{Error, Result, Value};
+    pub use celkit_core::{Deserialize, Serialize};
+}
+
 pub mod macros {
     pub use celkit_core::impl_for_struct;
 }
 
 #[cfg(feature = "string")]
 pub use celkit_string::{from_str, to_mini, to_pretty, to_string};
+
+#[cfg(feature = "derive")]
+pub use celkit_derive::{Deserialize, Serialize};
