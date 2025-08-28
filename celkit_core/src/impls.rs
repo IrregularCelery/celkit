@@ -1064,7 +1064,6 @@ impl Deserialize for std::time::Duration {
 
 // ------------------------------- Struct --------------------------------- //
 
-// TODO: Unexpose the macro when the proc-macro is ready
 #[macro_export]
 macro_rules! impl_for_struct {
     (
