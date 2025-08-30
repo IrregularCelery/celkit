@@ -4,9 +4,9 @@ pub fn derive_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     let name = &input.ident;
 
     let impl_serialize = match &input.data {
-        syn::Data::Struct(data_struct) => generate_struct_serialize(name, &data_struct.fields),
-        syn::Data::Enum(data_enum) => todo!(),
-        syn::Data::Union(_data_union) => {
+        syn::Data::Struct(data) => generate_struct_serialize(name, data),
+        syn::Data::Enum(data) => generate_enum_serialize(name, data),
+        syn::Data::Union(_) => {
             return syn::Error::new_spanned(name, "Serialization isn't available for unions")
                 .to_compile_error()
                 .into();
@@ -22,9 +22,9 @@ pub fn derive_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     let name = &input.ident;
 
     let impl_deserialize = match &input.data {
-        syn::Data::Struct(data_struct) => generate_struct_deserialize(name, &data_struct.fields),
-        syn::Data::Enum(data_enum) => todo!(),
-        syn::Data::Union(_data_union) => {
+        syn::Data::Struct(data) => generate_struct_deserialize(name, data),
+        syn::Data::Enum(data) => generate_enum_deserialize(name, data),
+        syn::Data::Union(_) => {
             return syn::Error::new_spanned(name, "Serialization isn't available for unions")
                 .to_compile_error()
                 .into();
@@ -34,20 +34,17 @@ pub fn derive_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     proc_macro::TokenStream::from(impl_deserialize)
 }
 
-// ------------------------------ Serialize ------------------------------- //
+// ------------------------ Struct Serialization -------------------------- //
 
-fn generate_named_fields_struct_serialize(
+fn generate_named_struct_serialize(
     name: &syn::Ident,
     fields: &syn::FieldsNamed,
 ) -> proc_macro2::TokenStream {
     let field_count = fields.named.len();
     let fields = fields.named.iter().map(|field| {
-        let field_name = match &field.ident {
-            Some(ident) => ident,
-            None => {
-                return syn::Error::new_spanned(field, "Named field must have an identifier")
-                    .to_compile_error();
-            }
+        let Some(field_name) = &field.ident else {
+            return syn::Error::new_spanned(field, "Named field must have an identifier")
+                .to_compile_error();
         };
 
         quote::quote! {
@@ -73,7 +70,7 @@ fn generate_named_fields_struct_serialize(
     }
 }
 
-fn generate_unnamed_fields_struct_serialize(
+fn generate_unnamed_struct_serialize(
     name: &syn::Ident,
     fields: &syn::FieldsUnnamed,
 ) -> proc_macro2::TokenStream {
@@ -102,7 +99,7 @@ fn generate_unnamed_fields_struct_serialize(
     }
 }
 
-fn generate_unit_fields_struct_serialize(name: &syn::Ident) -> proc_macro2::TokenStream {
+fn generate_unit_struct_serialize(name: &syn::Ident) -> proc_macro2::TokenStream {
     quote::quote! {
         impl ::celkit::Serialize for #name {
             fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
@@ -114,21 +111,22 @@ fn generate_unit_fields_struct_serialize(name: &syn::Ident) -> proc_macro2::Toke
     }
 }
 
-fn generate_struct_serialize(name: &syn::Ident, fields: &syn::Fields) -> proc_macro2::TokenStream {
+fn generate_struct_serialize(
+    name: &syn::Ident,
+    data: &syn::DataStruct,
+) -> proc_macro2::TokenStream {
+    let fields = &data.fields;
+
     match fields {
-        syn::Fields::Named(fields_named) => {
-            generate_named_fields_struct_serialize(name, fields_named)
-        }
-        syn::Fields::Unnamed(fields_unnamed) => {
-            generate_unnamed_fields_struct_serialize(name, fields_unnamed)
-        }
-        syn::Fields::Unit => generate_unit_fields_struct_serialize(name),
+        syn::Fields::Named(fields) => generate_named_struct_serialize(name, fields),
+        syn::Fields::Unnamed(fields) => generate_unnamed_struct_serialize(name, fields),
+        syn::Fields::Unit => generate_unit_struct_serialize(name),
     }
 }
 
-// ----------------------------- Deserialize ------------------------------ //
+// ----------------------- Struct Deserialization ------------------------- //
 
-fn generate_named_fields_struct_deserialize(
+fn generate_named_struct_deserialize(
     name: &syn::Ident,
     fields: &syn::FieldsNamed,
 ) -> proc_macro2::TokenStream {
@@ -155,10 +153,9 @@ fn generate_named_fields_struct_deserialize(
         };
     }
 
-    let field_idents: Vec<_> = field_names.iter().map(|name| name.to_string()).collect();
     let expected_fields_array = quote::quote! {
         let expected_fields = [
-            #(::celkit::core::utils::unescape_identifier(stringify!(#field_idents))),*
+            #(::celkit::core::utils::unescape_identifier(stringify!(#field_names))),*
         ];
     };
     let field_declarations =
@@ -278,7 +275,7 @@ fn generate_named_fields_struct_deserialize(
     }
 }
 
-fn generate_unnamed_fields_struct_deserialize(
+fn generate_unnamed_struct_deserialize(
     name: &syn::Ident,
     fields: &syn::FieldsUnnamed,
 ) -> proc_macro2::TokenStream {
@@ -298,7 +295,6 @@ fn generate_unnamed_fields_struct_deserialize(
             )?;
         }
     });
-
     let field_idents = (0..field_count)
         .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()));
 
@@ -332,7 +328,7 @@ fn generate_unnamed_fields_struct_deserialize(
     }
 }
 
-fn generate_unit_fields_struct_deserialize(name: &syn::Ident) -> proc_macro2::TokenStream {
+fn generate_unit_struct_deserialize(name: &syn::Ident) -> proc_macro2::TokenStream {
     quote::quote! {
         impl ::celkit::Deserialize for #name {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
@@ -350,15 +346,330 @@ fn generate_unit_fields_struct_deserialize(name: &syn::Ident) -> proc_macro2::To
 
 fn generate_struct_deserialize(
     name: &syn::Ident,
-    fields: &syn::Fields,
+    data: &syn::DataStruct,
 ) -> proc_macro2::TokenStream {
+    let fields = &data.fields;
+
     match fields {
-        syn::Fields::Named(fields_named) => {
-            generate_named_fields_struct_deserialize(name, fields_named)
+        syn::Fields::Named(fields) => generate_named_struct_deserialize(name, fields),
+        syn::Fields::Unnamed(fields) => generate_unnamed_struct_deserialize(name, fields),
+        syn::Fields::Unit => generate_unit_struct_deserialize(name),
+    }
+}
+
+// ------------------------- Enum Serialization --------------------------- //
+
+fn generate_named_enum_serialize(
+    name: &syn::Ident,
+    variant_name: &syn::Ident,
+    fields: &syn::FieldsNamed,
+) -> proc_macro2::TokenStream {
+    let field_count = fields.named.len();
+    let field_names: Vec<_> = fields
+        .named
+        .iter()
+        .filter_map(|f| f.ident.as_ref())
+        .collect();
+    let fields = field_names.iter().map(|field_name| {
+        quote::quote! {
+            fields.push((stringify!(#field_name).to_string(), #field_name.serialize()?));
         }
-        syn::Fields::Unnamed(fields_unnamed) => {
-            generate_unnamed_fields_struct_deserialize(name, fields_unnamed)
+    });
+
+    quote::quote! {
+        #name::#variant_name { #(#field_names),* } => {
+            use ::celkit::core::*;
+
+            let mut fields = Vec::with_capacity(#field_count);
+
+            #(#fields)*
+
+            let variant_value = ::celkit::core::Value::Struct(fields);
+            let mut variant_object = BTreeMap::new();
+
+            variant_object.insert(stringify!(#variant_name).to_string(), variant_value);
+
+            Ok(::celkit::core::Value::Object(variant_object))
         }
-        syn::Fields::Unit => generate_unit_fields_struct_deserialize(name),
+    }
+}
+
+fn generate_unnamed_enum_serialize(
+    name: &syn::Ident,
+    variant_name: &syn::Ident,
+    fields: &syn::FieldsUnnamed,
+) -> proc_macro2::TokenStream {
+    let field_count = fields.unnamed.len();
+    let field_names: Vec<_> = (0..field_count)
+        .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()))
+        .collect();
+    let fields = field_names.iter().map(|field_name| {
+        quote::quote! {
+            fields.push(#field_name.serialize()?);
+        }
+    });
+
+    quote::quote! {
+        #name::#variant_name(#(#field_names),*) => {
+            use ::celkit::core::*;
+
+            let mut fields = Vec::with_capacity(#field_count);
+
+            #(#fields)*
+
+            let variant_value = ::celkit::core::Value::Tuple(fields);
+            let mut variant_object = BTreeMap::new();
+
+            variant_object.insert(stringify!(#variant_name).to_string(), variant_value);
+
+            Ok(::celkit::core::Value::Object(variant_object))
+        }
+    }
+}
+
+fn generate_unit_enum_serialize(
+    name: &syn::Ident,
+    variant_name: &syn::Ident,
+) -> proc_macro2::TokenStream {
+    quote::quote! {
+        #name::#variant_name => {
+            use ::celkit::core::*;
+
+            let mut variant_object = BTreeMap::new();
+
+            variant_object.insert(stringify!(#variant_name).to_string(), ::celkit::core::Value::Null);
+
+            Ok(::celkit::core::Value::Object(variant_object))
+        }
+    }
+}
+
+fn generate_enum_serialize(name: &syn::Ident, data: &syn::DataEnum) -> proc_macro2::TokenStream {
+    if data.variants.is_empty() {
+        return quote::quote! {
+            impl ::celkit::Serialize for #name {
+                fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
+                    // This is unreachable because you cannot construct a value of empty enum
+                    match *self {}
+                }
+            }
+        };
+    }
+
+    let variants = data.variants.iter().map(|variant| {
+        let variant_name = &variant.ident;
+
+        match &variant.fields {
+            syn::Fields::Named(fields) => generate_named_enum_serialize(name, variant_name, fields),
+            syn::Fields::Unnamed(fields) => {
+                generate_unnamed_enum_serialize(name, variant_name, fields)
+            }
+            syn::Fields::Unit => generate_unit_enum_serialize(name, variant_name),
+        }
+    });
+
+    quote::quote! {
+        impl ::celkit::Serialize for #name {
+            fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
+                match self {
+                    #(#variants)*
+                }
+            }
+        }
+    }
+}
+
+// ------------------------ Enum Deserialization -------------------------- //
+
+fn generate_named_enum_deserialize(
+    name: &syn::Ident,
+    variant_name: &syn::Ident,
+    fields: &syn::FieldsNamed,
+) -> proc_macro2::TokenStream {
+    let field_names: Vec<_> = fields
+        .named
+        .iter()
+        .filter_map(|f| f.ident.as_ref())
+        .collect();
+    let field_types: Vec<_> = fields.named.iter().map(|f| &f.ty).collect();
+    let field_declarations =
+        field_names
+            .iter()
+            .zip(field_types.iter())
+            .map(|(field_name, field_type)| {
+                quote::quote! {
+                    let mut #field_name: Option<#field_type> = None;
+                }
+            });
+    let field_matching =
+        field_names
+            .iter()
+            .zip(field_types.iter())
+            .map(|(field_name, field_type)| {
+                quote::quote! {
+                    if field_name == stringify!(#field_name) {
+                        #field_name = Some(<#field_type>::deserialize(field_value)?);
+
+                        continue;
+                    }
+                }
+            });
+    let field_assignments = field_names.iter().map(|field_name| {
+        quote::quote! {
+            let #field_name = #field_name.ok_or_else(|| {
+                ::celkit::core::Error::new(format!(
+                    "Missing `{}` field in variant `{}`",
+                    stringify!(#field_name),
+                    stringify!(#variant_name),
+                ))
+            })?;
+        }
+    });
+
+    quote::quote! {
+        stringify!(#variant_name) => {
+            match variant_value {
+                ::celkit::core::Value::Struct(fields) => {
+                    #(#field_declarations)*
+
+                    for (field_name, field_value) in fields {
+                        #(#field_matching)*
+                    }
+
+                    #(#field_assignments)*
+
+                    Ok(#name::#variant_name { #(#field_names),* })
+                }
+                _ => Err(::celkit::core::Error::new(format!(
+                    "Expected `struct` for enum variant `{}`",
+                    stringify!(#variant_name),
+                )))
+            }
+        }
+    }
+}
+
+fn generate_unnamed_enum_deserialize(
+    name: &syn::Ident,
+    variant_name: &syn::Ident,
+    fields: &syn::FieldsUnnamed,
+) -> proc_macro2::TokenStream {
+    let field_count = fields.unnamed.len();
+    let field_types: Vec<_> = fields.unnamed.iter().map(|f| &f.ty).collect();
+    let fields = field_types.iter().enumerate().map(|(i, field_type)| {
+        let field_ident = syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site());
+
+        quote::quote! {
+            let #field_ident = <#field_type>::deserialize(
+                fields_iter.next()
+                    .ok_or_else(|| ::celkit::core::Error::new(format!(
+                        "Missing field {} in variant `{}`",
+                        #i,
+                        stringify!(#variant_name),
+                    )))?
+            )?;
+        }
+    });
+    let field_idents = (0..field_count)
+        .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()));
+
+    quote::quote! {
+        stringify!(#variant_name) => {
+            match variant_value {
+                ::celkit::core::Value::Tuple(fields) => {
+                    let mut fields_iter = fields.into_iter();
+
+                    #(#fields)*
+
+                    Ok(#name::#variant_name(#(#field_idents),*))
+                }
+                _ => Err(::celkit::core::Error::new(format!(
+                    "Expected `tuple` for enum variant `{}`",
+                    stringify!(#variant_name),
+                )))
+            }
+        }
+    }
+}
+
+fn generate_unit_enum_deserialize(
+    name: &syn::Ident,
+    variant_name: &syn::Ident,
+) -> proc_macro2::TokenStream {
+    quote::quote! {
+        stringify!(#variant_name) => {
+            match variant_value {
+                ::celkit::core::Value::Null => Ok(#name::#variant_name),
+                _ => Err(::celkit::core::Error::new(format!(
+                    "Expected `null` for enum variant `{}`",
+                    stringify!(#variant_name),
+                )))
+            }
+        }
+    }
+}
+
+fn generate_enum_deserialize(name: &syn::Ident, data: &syn::DataEnum) -> proc_macro2::TokenStream {
+    if data.variants.is_empty() {
+        return quote::quote! {
+            impl ::celkit::Deserialize for #name {
+                fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
+                    Err(::celkit::core::Error::new(format!(
+                        "Cannot `deserialize` empty enum `{}`",
+                        stringify!(#name)
+                    )))
+                }
+            }
+        };
+    }
+
+    let variants = data.variants.iter().map(|variant| {
+        let variant_name = &variant.ident;
+
+        match &variant.fields {
+            syn::Fields::Named(fields) => {
+                generate_named_enum_deserialize(name, variant_name, fields)
+            }
+            syn::Fields::Unnamed(fields) => {
+                generate_unnamed_enum_deserialize(name, variant_name, fields)
+            }
+            syn::Fields::Unit => generate_unit_enum_deserialize(name, variant_name),
+        }
+    });
+
+    quote::quote! {
+        impl ::celkit::Deserialize for #name {
+            fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
+                match value {
+                    ::celkit::core::Value::Object(mut object) => {
+                        if object.len() != 1 {
+                            return Err(::celkit::core::Error::new(format!(
+                                "Expected `enum` object with exactly one entry for `{}`",
+                                stringify!(#name),
+                            )));
+                        }
+
+                        let (variant_name, variant_value) = object.into_iter().next()
+                            .ok_or_else(|| ::celkit::core::Error::new(format!(
+                                "Empty `enum` object while deserializing `{}`",
+                                stringify!(#name),
+                            )))?;
+
+                        match variant_name.as_str() {
+                            #(#variants)*
+                            _ => Err(::celkit::core::Error::new(format!(
+                                "Unknown `enum` variant `{}` for `{}`",
+                                variant_name,
+                                stringify!(#name),
+                            )))
+                        }
+                    }
+                    _ => Err(::celkit::core::Error::new(format!(
+                        "Expected `enum` object for `{}`",
+                        stringify!(#name)
+                    )))
+                }
+            }
+        }
     }
 }

@@ -824,7 +824,7 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
     fn deserialize(value: Value) -> Result<Self> {
         match value {
             Value::Object(mut object) => {
-                if object.len() > 1 {
+                if object.len() != 1 {
                     return Err(Error::new(
                         "Expected `Result` object with exactly one entry (`Ok` or `Err`)",
                     ));
