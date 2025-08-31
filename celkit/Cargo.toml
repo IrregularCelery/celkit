@@ -10,11 +10,14 @@ default = ["std"]
 std = [
   "celkit-core/std",
   "celkit-string?/std",
+  "celkit-binary?/std",
 ]
 string = ["celkit-string"]
+binary = ["celkit-binary"]
 derive = ["celkit-derive"]
 
 [dependencies]
 celkit-core = { path = "../celkit_core/" }
 celkit-string = { path = "../celkit_string/", optional = true }
+celkit-binary = { path = "../celkit_binary/", optional = true }
 celkit-derive = { path = "../celkit_derive/", optional = true }
