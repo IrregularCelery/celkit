@@ -1,3 +1,4 @@
+// TODO: Add `container` and `field` attributes
 #[proc_macro_derive(Serialize)]
 pub fn derive_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
