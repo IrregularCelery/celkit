@@ -169,6 +169,11 @@ mod mini {
             let fields: Result<Vec<String>> = value
                 .iter()
                 .map(|field| {
+                    // Handle tuple(unnamed fields) structs (e.g. MyStruct(i32, bool, String))
+                    if field.0.is_empty() {
+                        return Ok(self.encode_value(&field.1)?);
+                    }
+
                     Ok(format!(
                         "{}{}{}",
                         field.0, // Field name
@@ -733,6 +738,15 @@ mod pretty {
                         .max_line_length
                         .saturating_sub(next_indent.len())
                         .saturating_sub(key_length);
+
+                    // Handle tuple(unnamed fields) structs (e.g. MyStruct(i32, bool, String))
+                    if field.0.is_empty() {
+                        return Ok(self.encode_value(
+                            &field.1,
+                            depth + 1,
+                            Some(available_length),
+                        )?);
+                    }
 
                     Ok(format!(
                         "{} {} {}",

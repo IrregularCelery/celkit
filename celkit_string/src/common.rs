@@ -1,3 +1,5 @@
+// TODO: Make error messages more consistant across components
+
 use celkit_core::internal::sys::*;
 use celkit_core::internal::Number;
 

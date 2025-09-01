@@ -42,6 +42,19 @@ impl Decoder {
         Error::with_context(message, context, self.line, self.column)
     }
 
+    fn save_checkpoint(&self) -> (usize, Option<char>, usize, usize) {
+        (self.position, self.current_char, self.line, self.column)
+    }
+
+    fn load_checkpoint(&mut self, checkpoint: (usize, Option<char>, usize, usize)) {
+        let (position, currect_char, line, column) = checkpoint;
+
+        self.position = position;
+        self.current_char = currect_char;
+        self.line = line;
+        self.column = column;
+    }
+
     fn peek(&self) -> Option<&char> {
         self.input.get(self.position + 1)
     }
@@ -424,24 +437,24 @@ impl Decoder {
                 "Integer is too large and exceeds the bounds of singed int: '{}'",
                 numeric
             )));
-        } else {
-            // Try unsigned types first, then signed
-            try_parse!(u8, U8);
-            try_parse!(i8, I8);
-            try_parse!(u16, U16);
-            try_parse!(i16, I16);
-            try_parse!(u32, U32);
-            try_parse!(i32, I32);
-            try_parse!(u64, U64);
-            try_parse!(i64, I64);
-            try_parse!(u128, U128);
-            try_parse!(i128, I128);
-
-            return Err(self.error(format!(
-                "Integer is too large and exceeds the bounds of unsinged int: '{}'",
-                numeric
-            )));
         }
+
+        // Try unsigned types first, then signed
+        try_parse!(u8, U8);
+        try_parse!(i8, I8);
+        try_parse!(u16, U16);
+        try_parse!(i16, I16);
+        try_parse!(u32, U32);
+        try_parse!(i32, I32);
+        try_parse!(u64, U64);
+        try_parse!(i64, I64);
+        try_parse!(u128, U128);
+        try_parse!(i128, I128);
+
+        Err(self.error(format!(
+            "Integer is too large and exceeds the bounds of unsinged int: '{}'",
+            numeric
+        )))
     }
 
     fn find_identifier_or_keyword(&mut self, expected_identifier: bool) -> Result<Token> {
@@ -512,6 +525,7 @@ impl Decoder {
                 _ => self.error(format!("Expected '{}' in {}", expected, context)),
             });
         }
+
         Ok(())
     }
 
@@ -526,7 +540,8 @@ impl Decoder {
         )?;
 
         let mut fields = Vec::new();
-        let mut empty = true;
+        let mut is_empty = true;
+        let mut is_unnamed_struct: Option<bool> = None; // e.g. MyStruct(i32, bool, String)
 
         loop {
             self.skip_comment_and_whitespace()?;
@@ -538,7 +553,7 @@ impl Decoder {
                 break;
             }
 
-            if !empty {
+            if !is_empty {
                 self.expect_token(Token::Separator, "struct fields")?;
 
                 self.skip_comment_and_whitespace()?;
@@ -550,48 +565,99 @@ impl Decoder {
                 }
             }
 
-            // Decode field
-            // Next token must be an identifier
-            let token = self.next_token_with_context(false)?;
+            if is_unnamed_struct.is_none() {
+                self.skip_comment_and_whitespace()?;
 
-            match token {
-                Token::Identifier(i /* Field name */) => {
-                    let token = self.next_token()?;
+                is_unnamed_struct = match self.current_char {
+                    // These indicate tuple(unnamed fields) struct (values, not names)
+                    Some(c) if c == '"' || c.is_ascii_digit() || c == '+' || c == '-' => Some(true),
+                    // Possibly an identifier
+                    Some(c) if c.is_alphabetic() || c == 'r' => {
+                        let checkpoint = self.save_checkpoint();
 
-                    if token != Token::FieldAssign {
-                        return Err(match token {
-                            Token::KeyAssign => self.error(format!(
-                                "Found '{}' but expected '{}' after struct field name",
-                                Token::KeyAssign,
-                                Token::FieldAssign
-                            )),
-                            Token::Eof => self
-                                .error(format!("Unexpected end of input after field name '{}'", i)),
-                            _ => self.error(format!(
-                                "Expected '{}' after struct field name '{}'",
-                                Token::FieldAssign,
-                                i
-                            )),
-                        });
+                        let is_tuple_struct = match self.find_identifier_or_keyword(false) {
+                            Ok(Token::Identifier(_)) => {
+                                self.skip_comment_and_whitespace()?;
+
+                                match self.current_char {
+                                    c if c == Token::FieldAssign.to_char()
+                                        || c == Token::KeyAssign.to_char() =>
+                                    {
+                                        false
+                                    }
+                                    _ => true, // Assign character not found, possibly a value
+                                }
+                            }
+                            _ => true, // Keywords(values)
+                        };
+
+                        self.load_checkpoint(checkpoint);
+
+                        Some(is_tuple_struct)
                     }
-
-                    let value = self.decode_value()?;
-
-                    fields.push((i, value));
+                    _ => Some(true),
                 }
-                Token::Eof => {
-                    return Err(self.error(format!(
-                        "Unexpected end of input while parsing struct: Missing closing '{}'",
-                        Token::TupleClose
-                    )))
-                }
-                Token::TupleClose => {
-                    // The end of the struct or an empty struct, already handled
-                }
-                _ => return Err(self.error("Expected field name in struct")),
             }
 
-            empty = false;
+            // Decode field
+            match is_unnamed_struct {
+                Some(true) => {
+                    let value = self.decode_value()?;
+
+                    fields.push((String::new(), value));
+                }
+                Some(false) => {
+                    let is_expecting_value = false;
+
+                    // Next token must be an identifier
+                    let token = self.next_token_with_context(is_expecting_value)?;
+
+                    match token {
+                        Token::Identifier(i /* Field name */) => {
+                            let token = self.next_token()?;
+
+                            if token != Token::FieldAssign {
+                                return Err(match token {
+                                    Token::KeyAssign => self.error(format!(
+                                        "Found '{}' but expected '{}' after struct field name",
+                                        Token::KeyAssign,
+                                        Token::FieldAssign
+                                    )),
+                                    Token::Eof => self.error(format!(
+                                        "Unexpected end of input after field name '{}'",
+                                        i
+                                    )),
+                                    _ => self.error(format!(
+                                        "Expected '{}' after struct field name '{}'",
+                                        Token::FieldAssign,
+                                        i
+                                    )),
+                                });
+                            }
+
+                            let value = self.decode_value()?;
+
+                            fields.push((i, value));
+                        }
+                        Token::Eof => {
+                            return Err(self.error(format!(
+                                "Unexpected end of input while parsing struct: \
+                                Missing closing '{}'",
+                                Token::TupleClose
+                            )))
+                        }
+                        Token::TupleClose => {
+                            // The end of the struct or an empty struct, already handled
+                        }
+                        _ => return Err(self.error("Expected field name in struct")),
+                    }
+                }
+                None => unreachable!(
+                    "This SHOULD never happen because `is_unnamed_struct` is always something!"
+                ),
+            }
+
+            is_empty = false;
         }
 
         Ok(Value::Struct(fields))
@@ -599,7 +665,7 @@ impl Decoder {
 
     fn decode_array(&mut self) -> Result<Value> {
         let mut items = Vec::new();
-        let mut empty = true;
+        let mut is_empty = true;
 
         loop {
             self.skip_comment_and_whitespace()?;
@@ -611,7 +677,7 @@ impl Decoder {
                 break;
             }
 
-            if !empty {
+            if !is_empty {
                 self.expect_token(Token::Separator, "array items")?;
 
                 self.skip_comment_and_whitespace()?;
@@ -628,7 +694,7 @@ impl Decoder {
 
             items.push(value);
 
-            empty = false;
+            is_empty = false;
         }
 
         Ok(Value::Array(items))
@@ -636,7 +702,7 @@ impl Decoder {
 
     fn decode_tuple(&mut self) -> Result<Value> {
         let mut members = Vec::new();
-        let mut empty = true;
+        let mut is_empty = true;
 
         loop {
             // Check for TupleClose for handling empty tuples
@@ -648,7 +714,7 @@ impl Decoder {
                 break;
             }
 
-            if !empty {
+            if !is_empty {
                 self.expect_token(Token::Separator, "tuple members")?;
 
                 self.skip_comment_and_whitespace()?;
@@ -665,7 +731,7 @@ impl Decoder {
 
             members.push(value);
 
-            empty = false;
+            is_empty = false;
         }
 
         Ok(Value::Tuple(members))
@@ -673,7 +739,7 @@ impl Decoder {
 
     fn decode_object(&mut self) -> Result<Value> {
         let mut entries = BTreeMap::new();
-        let mut empty = true;
+        let mut is_empty = true;
 
         loop {
             // Check for ObjectClose for handling empty objects
@@ -685,7 +751,7 @@ impl Decoder {
                 break;
             }
 
-            if !empty {
+            if !is_empty {
                 self.expect_token(Token::Separator, "object entries")?;
 
                 self.skip_comment_and_whitespace()?;
@@ -741,7 +807,7 @@ impl Decoder {
                 _ => return Err(self.error("Expected string key in object")),
             }
 
-            empty = false;
+            is_empty = false;
         }
 
         Ok(Value::Object(entries))

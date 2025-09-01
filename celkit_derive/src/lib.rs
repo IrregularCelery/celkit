@@ -80,7 +80,7 @@ fn generate_unnamed_struct_serialize(
         let index = syn::Index::from(i);
 
         quote::quote! {
-            fields.push(self.#index.serialize()?);
+            fields.push((String::new(), self.#index.serialize()?));
         }
     });
 
@@ -93,8 +93,7 @@ fn generate_unnamed_struct_serialize(
 
                 #(#fields)*
 
-                Ok(::celkit::core::Value::Tuple(fields)) // TODO: Look into this, might wanna have
-                                                         // different format
+                Ok(::celkit::core::Value::Struct(fields))
             }
         }
     }
@@ -292,7 +291,7 @@ fn generate_unnamed_struct_deserialize(
                         "Missing field {} in struct `{}`",
                         #i,
                         stringify!(#name),
-                    )))?
+                    )))?.1
             )?;
         }
     });
@@ -303,7 +302,7 @@ fn generate_unnamed_struct_deserialize(
         impl ::celkit::Deserialize for #name {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
-                    ::celkit::core::Value::Tuple(fields) => {
+                    ::celkit::core::Value::Struct(fields) => {
                         if fields.len() != #field_count {
                             return Err(::celkit::core::Error::new(format!(
                                 "Expected {} fields for struct `{}`, got {}",
@@ -320,7 +319,7 @@ fn generate_unnamed_struct_deserialize(
                         Ok(#name(#(#field_idents),*))
                     }
                     _ => Err(::celkit::core::Error::new(format!(
-                        "Expected `tuple` for struct `{}`",
+                        "Expected `{}` struct",
                         stringify!(#name),
                     )))
                 }
