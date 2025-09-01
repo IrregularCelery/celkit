@@ -1111,10 +1111,10 @@ macro_rules! impl_for_struct {
                             $crate::internal::utils::unescape_identifier(stringify!($field_name))
                         ),*];
 
-                        let mut positional = false;
+                        let mut is_positional = false;
 
                         if fields.len() == expected_fields.len() {
-                            positional = true;
+                            is_positional = true;
 
                             for (i, (field_name, field_value)) in fields.iter().enumerate() {
                                 if field_name.is_empty() {
@@ -1124,7 +1124,7 @@ macro_rules! impl_for_struct {
 
                                 if expected_fields[i] != field_name {
                                     // Order isn't correct
-                                    positional = false;
+                                    is_positional = false;
 
                                     break;
                                 }
@@ -1132,7 +1132,7 @@ macro_rules! impl_for_struct {
                         }
 
                         // Ordered, we match the expected fields
-                        if positional {
+                        if is_positional {
                             let mut fields_iter = fields.into_iter();
 
                             $(
