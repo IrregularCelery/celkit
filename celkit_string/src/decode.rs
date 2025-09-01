@@ -649,7 +649,11 @@ impl Decoder {
                         Token::TupleClose => {
                             // The end of the struct or an empty struct, already handled
                         }
-                        _ => return Err(self.error("Expected field name in struct")),
+                        t => {
+                            return Err(
+                                self.error(format!("Expected field name in struct, found `{}`", t))
+                            )
+                        }
                     }
                 }
                 None => unreachable!(

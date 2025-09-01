@@ -372,7 +372,10 @@ fn generate_named_enum_serialize(
         .collect();
     let fields = field_names.iter().map(|field_name| {
         quote::quote! {
-            fields.push((stringify!(#field_name).to_string(), #field_name.serialize()?));
+            fields.push((
+                ::celkit::core::utils::unescape_identifier(stringify!(#field_name)).to_string(),
+                #field_name.serialize()?
+            ));
         }
     });
 
@@ -492,6 +495,28 @@ fn generate_named_enum_deserialize(
         .filter_map(|f| f.ident.as_ref())
         .collect();
     let field_types: Vec<_> = fields.named.iter().map(|f| &f.ty).collect();
+
+    if field_names.is_empty() {
+        return quote::quote! {
+            stringify!(#variant_name) => {
+                match variant_value {
+                    ::celkit::core::Value::Struct(fields) if fields.is_empty() => {
+                        Ok(#name::#variant_name {})
+                    }
+                    _ => Err(::celkit::core::Error::new(format!(
+                        "Expected `empty` struct for enum variant `{}`",
+                        stringify!(#variant_name)
+                    )))
+                }
+            }
+        };
+    }
+
+    let expected_fields_array = quote::quote! {
+        let expected_fields = [
+            #(::celkit::core::utils::unescape_identifier(stringify!(#field_names))),*
+        ];
+    };
     let field_declarations =
         field_names
             .iter()
@@ -507,7 +532,9 @@ fn generate_named_enum_deserialize(
             .zip(field_types.iter())
             .map(|(field_name, field_type)| {
                 quote::quote! {
-                    if field_name == stringify!(#field_name) {
+                    if field_name
+                        == ::celkit::core::utils::unescape_identifier(stringify!(#field_name))
+                    {
                         #field_name = Some(<#field_type>::deserialize(field_value)?);
 
                         continue;
@@ -518,27 +545,83 @@ fn generate_named_enum_deserialize(
         quote::quote! {
             let #field_name = #field_name.ok_or_else(|| {
                 ::celkit::core::Error::new(format!(
-                    "Missing `{}` field in variant `{}`",
-                    stringify!(#field_name),
+                    "Missing field `{}` in variant `{}`",
+                    ::celkit::core::utils::unescape_identifier(stringify!(#field_name)),
                     stringify!(#variant_name),
                 ))
             })?;
         }
     });
+    let positional_field_assignments =
+        field_names
+            .iter()
+            .zip(field_types.iter())
+            .map(|(field_name, field_type)| {
+                quote::quote! {
+                    let #field_name = {
+                        let (_, field_value) = fields_iter
+                            .next()
+                            .ok_or_else(|| ::celkit::core::Error::new(format!(
+                                "Missing field `{}` in positional deserialization of variant `{}`",
+                                ::celkit::core::utils::unescape_identifier(stringify!(#field_name)),
+                                stringify!(#variant_name),
+                            )))?;
+
+                        <#field_type>::deserialize(field_value)?
+                    };
+                }
+            });
+    let variant_construction = quote::quote! {
+        Ok(#name::#variant_name {
+            #(#field_names),*
+        })
+    };
 
     quote::quote! {
         stringify!(#variant_name) => {
             match variant_value {
                 ::celkit::core::Value::Struct(fields) => {
+                    #expected_fields_array
+                    let mut positional = false;
+
+                    if fields.len() == expected_fields.len() {
+                        positional = true;
+
+                        for (i, (field_name, _)) in fields.iter().enumerate() {
+                            if field_name.is_empty() {
+                                // Order must be correct or error
+                                break;
+                            }
+
+                            if i >= expected_fields.len() || expected_fields[i] != field_name {
+                                // Order isn't correct
+                                positional = false;
+
+                                break;
+                            }
+                        }
+                    }
+
+                    // Ordered, we match the expected fields
+                    if positional {
+                        let mut fields_iter = fields.into_iter();
+
+                        #(#positional_field_assignments)*
+
+                        return #variant_construction;
+                    }
+
                     #(#field_declarations)*
 
+                    // Unordered, we search for the values by names
                     for (field_name, field_value) in fields {
                         #(#field_matching)*
                     }
 
+                    // Check whether all of the fields were found
                     #(#field_assignments)*
 
-                    Ok(#name::#variant_name { #(#field_names),* })
+                    #variant_construction
                 }
                 _ => Err(::celkit::core::Error::new(format!(
                     "Expected `struct` for enum variant `{}`",
