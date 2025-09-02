@@ -1,6 +1,3 @@
-// TODO: Add implementations for these as well:
-//       - More std stuff
-
 use crate::core::{Deserialize, Serialize};
 use crate::internal::sys::*;
 use crate::internal::{Error, Number, Result, Value};
@@ -1089,6 +1086,40 @@ impl<T: Serialize> Serialize for std::sync::Arc<T> {
 impl<T: Deserialize> Deserialize for std::sync::Arc<T> {
     fn deserialize(value: Value) -> Result<Self> {
         Ok(std::sync::Arc::new(T::deserialize(value)?))
+    }
+}
+
+// -------------------------------- Cell ---------------------------------- //
+
+#[cfg(feature = "std")]
+impl<T: Serialize + Copy> Serialize for std::cell::Cell<T> {
+    fn serialize(&self) -> Result<Value> {
+        self.get().serialize()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<T: Deserialize> Deserialize for std::cell::Cell<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        Ok(std::cell::Cell::new(T::deserialize(value)?))
+    }
+}
+
+// ------------------------------- RefCell -------------------------------- //
+
+#[cfg(feature = "std")]
+impl<T: Serialize> Serialize for std::cell::RefCell<T> {
+    fn serialize(&self) -> Result<Value> {
+        self.try_borrow()
+            .map_err(|_| Error::new("`RefCell` is already borrowed mutably"))?
+            .serialize()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<T: Deserialize> Deserialize for std::cell::RefCell<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        Ok(std::cell::RefCell::new(T::deserialize(value)?))
     }
 }
 
