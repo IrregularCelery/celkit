@@ -89,6 +89,20 @@ macro_rules! impl_for_integer {
                                     stringify!($type)
                                 ))
                             }),
+                            Number::Usize(n) => <$type>::try_from(n).map_err(|_| {
+                                Error::new(format!(
+                                    "Cannot convert `usize` number {} to `{}`",
+                                    n,
+                                    stringify!($type)
+                                ))
+                            }),
+                            Number::Isize(n) => <$type>::try_from(n).map_err(|_| {
+                                Error::new(format!(
+                                    "Cannot convert `isize` number {} to `{}`",
+                                    n,
+                                    stringify!($type)
+                                ))
+                            }),
                             Number::F32(n) => {
                                 if !n.is_finite() {
                                     return Err(Error::new(format!(
@@ -231,6 +245,8 @@ impl_for_integer!(u64, U64);
 impl_for_integer!(i64, I64);
 impl_for_integer!(u128, U128);
 impl_for_integer!(i128, I128);
+impl_for_integer!(usize, Usize);
+impl_for_integer!(isize, Isize);
 
 // -------------------------------- Float --------------------------------- //
 
@@ -376,7 +392,8 @@ impl Deserialize for f32 {
 
                         if n_f32 as u128 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert `u128` number {} to `f32` without loss of precision",
+                                "Cannot convert `u128` number {} to `f32` \
+                                without loss of precision",
                                 n,
                             )));
                         }
@@ -395,7 +412,48 @@ impl Deserialize for f32 {
 
                         if n_f32 as i128 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert `i128` number {} to `f32` without loss of precision",
+                                "Cannot convert `i128` number {} to `f32` \
+                                without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f32
+                    }
+                    Number::Usize(n) => {
+                        let n_f32 = n as f32;
+
+                        if n_f32.is_infinite() {
+                            return Err(Error::new(format!(
+                                "`usize` value {} exceeds the bounds of `f32`",
+                                n
+                            )));
+                        }
+
+                        if n_f32 as usize != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert `usize` number {} to `f32` \
+                                without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f32
+                    }
+                    Number::Isize(n) => {
+                        let n_f32 = n as f32;
+
+                        if n_f32.is_infinite() {
+                            return Err(Error::new(format!(
+                                "`isize` value {} exceeds the bounds of `f32`",
+                                n
+                            )));
+                        }
+
+                        if n_f32 as isize != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert `isize` number {} to `f32` \
+                                without loss of precision",
                                 n,
                             )));
                         }
@@ -490,7 +548,8 @@ impl Deserialize for f64 {
 
                         if n_f64 as u128 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert `u128` number {} to `f64` without loss of precision",
+                                "Cannot convert `u128` number {} to `f64` \
+                                without loss of precision",
                                 n,
                             )));
                         }
@@ -509,7 +568,48 @@ impl Deserialize for f64 {
 
                         if n_f64 as i128 != n {
                             return Err(Error::new(format!(
-                                "Cannot convert `i128` number {} to `f64` without loss of precision",
+                                "Cannot convert `i128` number {} to `f64` \
+                                without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f64
+                    }
+                    Number::Usize(n) => {
+                        let n_f64 = n as f64;
+
+                        if n_f64.is_infinite() {
+                            return Err(Error::new(format!(
+                                "`usize` value {} exceeds the bounds of `f64`",
+                                n
+                            )));
+                        }
+
+                        if n_f64 as usize != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert `usize` number {} to `f64` \
+                                without loss of precision",
+                                n,
+                            )));
+                        }
+
+                        n_f64
+                    }
+                    Number::Isize(n) => {
+                        let n_f64 = n as f64;
+
+                        if n_f64.is_infinite() {
+                            return Err(Error::new(format!(
+                                "`isize` value {} exceeds the bounds of `f64`",
+                                n
+                            )));
+                        }
+
+                        if n_f64 as isize != n {
+                            return Err(Error::new(format!(
+                                "Cannot convert `isize` number {} to `f64` \
+                                without loss of precision",
                                 n,
                             )));
                         }
@@ -881,6 +981,18 @@ impl Deserialize for std::time::Duration {
                                 n,
                             ))
                         })?,
+                        Number::Usize(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `usize` number {} to `u64` for `secs`",
+                                n,
+                            ))
+                        })?,
+                        Number::Isize(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `isize` number {} to `u64` for `secs`",
+                                n,
+                            ))
+                        })?,
                         Number::F32(n) => {
                             if n < 0.0 || n.is_infinite() || n.is_nan() {
                                 return Err(Error::new(format!(
@@ -967,6 +1079,18 @@ impl Deserialize for std::time::Duration {
                         Number::I128(n) => n.try_into().map_err(|_| {
                             Error::new(format!(
                                 "Cannot convert `i128` number {} to `u32` for `nanos`",
+                                n,
+                            ))
+                        })?,
+                        Number::Usize(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `usize` number {} to `u64` for `secs`",
+                                n,
+                            ))
+                        })?,
+                        Number::Isize(n) => n.try_into().map_err(|_| {
+                            Error::new(format!(
+                                "Cannot convert `isize` number {} to `u64` for `secs`",
                                 n,
                             ))
                         })?,

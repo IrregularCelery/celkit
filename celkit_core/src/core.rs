@@ -12,6 +12,8 @@ pub enum Number {
     I64(i64),
     U128(u128),
     I128(i128),
+    Usize(usize),
+    Isize(isize),
     F32(f32),
     F64(f64),
 }
@@ -29,6 +31,8 @@ impl core::fmt::Display for Number {
             Number::I64(n) => core::write!(f, "{}", n),
             Number::U128(n) => core::write!(f, "{}", n),
             Number::I128(n) => core::write!(f, "{}", n),
+            Number::Usize(n) => core::write!(f, "{}", n),
+            Number::Isize(n) => core::write!(f, "{}", n),
             Number::F32(n) => core::write!(f, "{}", n),
             Number::F64(n) => core::write!(f, "{}", n),
         }
