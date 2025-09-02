@@ -369,7 +369,10 @@ mod pretty {
             // to account for a possible comma from the parent.
             let comma_allowance = if depth > 0 { 1 } else { 0 };
 
-            let default_max_length = self.max_line_length - current_indent.len() - comma_allowance;
+            let default_max_length = self
+                .max_line_length
+                .saturating_sub(current_indent.len())
+                .saturating_sub(comma_allowance);
             let single_line_max_length = available_line_length.unwrap_or(default_max_length);
 
             // Check if it exceeded the line limit
@@ -493,7 +496,10 @@ mod pretty {
             // to account for a possible comma from the parent.
             let comma_allowance = if depth > 0 { 1 } else { 0 };
 
-            let default_max_length = self.max_line_length - current_indent.len() - comma_allowance;
+            let default_max_length = self
+                .max_line_length
+                .saturating_sub(current_indent.len())
+                .saturating_sub(comma_allowance);
             let single_line_max_length = available_line_length.unwrap_or(default_max_length);
 
             // Check if it exceeded the line limit
@@ -629,7 +635,10 @@ mod pretty {
             // to account for a possible comma from the parent.
             let comma_allowance = if depth > 0 { 1 } else { 0 };
 
-            let default_max_length = self.max_line_length - current_indent.len() - comma_allowance;
+            let default_max_length = self
+                .max_line_length
+                .saturating_sub(current_indent.len())
+                .saturating_sub(comma_allowance);
             let single_line_max_length = available_line_length.unwrap_or(default_max_length);
 
             // Check if it exceeded the line limit
