@@ -1,7 +1,5 @@
 // TODO: Add implementations for these as well:
 //       - More std stuff
-//       - Enum
-//       - Rc/Arc
 
 use crate::core::{Deserialize, Serialize};
 use crate::internal::sys::*;
@@ -205,40 +203,6 @@ macro_rules! impl_for_tuple {
             }
         }
     };
-}
-
-// --------------------------------- Box ---------------------------------- //
-
-impl<T: Serialize> Serialize for Box<T> {
-    fn serialize(&self) -> Result<Value> {
-        self.as_ref().serialize()
-    }
-}
-
-impl<T: Deserialize> Deserialize for Box<T> {
-    fn deserialize(value: Value) -> Result<Self> {
-        Ok(Box::new(T::deserialize(value)?))
-    }
-}
-
-// ------------------------------- Option --------------------------------- //
-
-impl<T: Serialize> Serialize for Option<T> {
-    fn serialize(&self) -> Result<Value> {
-        match self {
-            Some(value) => value.serialize(),
-            None => Ok(Value::Null),
-        }
-    }
-}
-
-impl<T: Deserialize> Deserialize for Option<T> {
-    fn deserialize(value: Value) -> Result<Self> {
-        match value {
-            Value::Null => Ok(None),
-            value => Ok(Some(T::deserialize(value)?)),
-        }
-    }
 }
 
 // ------------------------------- Boolean -------------------------------- //
@@ -1059,6 +1023,72 @@ impl Deserialize for std::time::Duration {
             }
             _ => Err(Error::new("Expected `Duration` object")),
         }
+    }
+}
+
+// --------------------------------- Box ---------------------------------- //
+
+impl<T: Serialize> Serialize for Box<T> {
+    fn serialize(&self) -> Result<Value> {
+        self.as_ref().serialize()
+    }
+}
+
+impl<T: Deserialize> Deserialize for Box<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        Ok(Box::new(T::deserialize(value)?))
+    }
+}
+
+// ------------------------------- Option --------------------------------- //
+
+impl<T: Serialize> Serialize for Option<T> {
+    fn serialize(&self) -> Result<Value> {
+        match self {
+            Some(value) => value.serialize(),
+            None => Ok(Value::Null),
+        }
+    }
+}
+
+impl<T: Deserialize> Deserialize for Option<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Null => Ok(None),
+            value => Ok(Some(T::deserialize(value)?)),
+        }
+    }
+}
+
+// --------------------------------- Rc ----------------------------------- //
+
+#[cfg(feature = "std")]
+impl<T: Serialize> Serialize for std::rc::Rc<T> {
+    fn serialize(&self) -> Result<Value> {
+        self.as_ref().serialize()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<T: Deserialize> Deserialize for std::rc::Rc<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        Ok(std::rc::Rc::new(T::deserialize(value)?))
+    }
+}
+
+// --------------------------------- Arc ---------------------------------- //
+
+#[cfg(feature = "std")]
+impl<T: Serialize> Serialize for std::sync::Arc<T> {
+    fn serialize(&self) -> Result<Value> {
+        self.as_ref().serialize()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<T: Deserialize> Deserialize for std::sync::Arc<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        Ok(std::sync::Arc::new(T::deserialize(value)?))
     }
 }
 
