@@ -833,11 +833,43 @@ impl<T: Deserialize + Ord> Deserialize for BTreeSet<T> {
 
                 Ok(set)
             }
-            _ => Err(Error::new("Expected `VecDeque` array")),
+            _ => Err(Error::new("Expected `BTreeSet` array")),
         }
     }
 }
 
+// ------------------------------- HashSet -------------------------------- //
+
+#[cfg(feature = "std")]
+impl<T: Serialize> Serialize for std::collections::HashSet<T> {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = Vec::with_capacity(self.len());
+
+        for item in self {
+            values.push(item.serialize()?);
+        }
+
+        Ok(Value::Array(values))
+    }
+}
+
+#[cfg(feature = "std")]
+impl<T: Deserialize + core::hash::Hash + Eq> Deserialize for std::collections::HashSet<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Array(array) => {
+                let mut set = std::collections::HashSet::with_capacity(array.len());
+
+                for value in array {
+                    set.insert(T::deserialize(value)?);
+                }
+
+                Ok(set)
+            }
+            _ => Err(Error::new("Expected `HashSet` array")),
+        }
+    }
+}
 // -------------------------------- Tuple --------------------------------- //
 
 impl Serialize for () {
