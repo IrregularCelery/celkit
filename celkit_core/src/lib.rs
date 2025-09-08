@@ -13,7 +13,7 @@ pub mod internal {
 
     pub mod sys {
         pub use alloc::boxed::Box;
-        pub use alloc::collections::BTreeMap;
+        pub use alloc::collections::{BTreeMap, VecDeque};
         pub use alloc::format;
         pub use alloc::string::{String, ToString};
         pub use alloc::vec::Vec;

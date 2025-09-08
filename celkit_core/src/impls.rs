@@ -776,6 +776,37 @@ impl<T: Deserialize> Deserialize for Vec<T> {
     }
 }
 
+// ------------------------------ VecDeque -------------------------------- //
+
+impl<T: Serialize> Serialize for VecDeque<T> {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = Vec::with_capacity(self.len());
+
+        for item in self {
+            values.push(item.serialize()?);
+        }
+
+        Ok(Value::Array(values))
+    }
+}
+
+impl<T: Deserialize> Deserialize for VecDeque<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Array(array) => {
+                let mut deque = VecDeque::with_capacity(array.len());
+
+                for value in array {
+                    deque.push_back(T::deserialize(value)?);
+                }
+
+                Ok(deque)
+            }
+            _ => Err(Error::new("Expected `VecDeque` array")),
+        }
+    }
+}
+
 // -------------------------------- Tuple --------------------------------- //
 
 impl Serialize for () {
