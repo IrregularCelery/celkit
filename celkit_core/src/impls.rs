@@ -807,6 +807,37 @@ impl<T: Deserialize> Deserialize for VecDeque<T> {
     }
 }
 
+// ------------------------------ BTreeSet -------------------------------- //
+
+impl<T: Serialize> Serialize for BTreeSet<T> {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = Vec::with_capacity(self.len());
+
+        for item in self {
+            values.push(item.serialize()?);
+        }
+
+        Ok(Value::Array(values))
+    }
+}
+
+impl<T: Deserialize + Ord> Deserialize for BTreeSet<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Array(array) => {
+                let mut set = BTreeSet::new();
+
+                for value in array {
+                    set.insert(T::deserialize(value)?);
+                }
+
+                Ok(set)
+            }
+            _ => Err(Error::new("Expected `VecDeque` array")),
+        }
+    }
+}
+
 // -------------------------------- Tuple --------------------------------- //
 
 impl Serialize for () {
