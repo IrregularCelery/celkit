@@ -1,3 +1,16 @@
+// NOTE:
+// Special-type serialization
+// The "0" field is a marker indicating this "struct" is special and must be handled differently
+// by encoders.
+// "0" is safe because struct field names cannot start with a non-alphabetic character, so it
+// will never conflict with user-defined fields.
+// The remaining fields carry the actual values. Depending on the encoder, they may be used
+// differently:
+// - String encoders: use field names as-is ("Ok", "secs", ...).
+// - Binary encoders: ignore field names and only encode the values in order.
+// Empty field names can be used for type-specific discriminants
+// (e.g. distinguishing Result::Ok vs Result::Err) when the names are ignored.
+
 use crate::core::{Deserialize, Serialize};
 use crate::internal::sys::*;
 use crate::internal::{Error, Number, Result, Value};
@@ -870,24 +883,85 @@ impl<V: Deserialize> Deserialize for std::collections::HashMap<String, V> {
 
 impl<T: Serialize, E: Serialize> Serialize for core::result::Result<T, E> {
     fn serialize(&self) -> Result<Value> {
-        let mut values = BTreeMap::new();
+        let mut values = Vec::with_capacity(3);
+
+        // See: "Special-type serialization" at the top of this file.
+        values.push(("0".to_string(), Value::Null));
 
         match self {
-            Ok(value) => values.insert("Ok".to_string(), value.serialize()?),
-            Err(error) => values.insert("Err".to_string(), error.serialize()?),
+            Ok(ok) => {
+                values.push((String::new(), Value::Number(Number::U8(1))));
+                values.push(("Ok".to_string(), ok.serialize()?));
+            }
+            Err(err) => {
+                values.push((String::new(), Value::Number(Number::U8(0))));
+                values.push(("Err".to_string(), err.serialize()?));
+            }
         };
 
-        Ok(Value::Object(values))
+        Ok(Value::Struct(values))
     }
 }
 
 impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> {
     fn deserialize(value: Value) -> Result<Self> {
         match value {
+            Value::Array(mut tuple) => {
+                if tuple.len() != 2 {
+                    return Err(Error::new(
+                        "Expected `Result` array with exactly two items [discriminant, value] \
+                        e.g. [{1/0}, value]",
+                    ));
+                }
+
+                // Pop in reverse order
+                let value = tuple
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+                let discriminant = tuple
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+
+                match discriminant {
+                    Value::Number(number) if number == Number::U8(1) => {
+                        Ok(Ok(T::deserialize(value)?))
+                    }
+                    Value::Number(number) if number == Number::U8(0) => {
+                        Ok(Err(E::deserialize(value)?))
+                    }
+                    _ => Err(Error::new("Invalid `Result` discriminant, expected 1 or 0")),
+                }
+            }
+            Value::Tuple(mut tuple) => {
+                if tuple.len() != 2 {
+                    return Err(Error::new(
+                        "Expected `Result` tuple with exactly two members (discriminant, value) \
+                        e.g. ({1/0}, value)",
+                    ));
+                }
+
+                // Pop in reverse order
+                let value = tuple
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+                let discriminant = tuple
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+
+                match discriminant {
+                    Value::Number(number) if number == Number::U8(1) => {
+                        Ok(Ok(T::deserialize(value)?))
+                    }
+                    Value::Number(number) if number == Number::U8(0) => {
+                        Ok(Err(E::deserialize(value)?))
+                    }
+                    _ => Err(Error::new("Invalid `Result` discriminant, expected 1 or 0")),
+                }
+            }
             Value::Object(mut object) => {
                 if object.len() != 1 {
                     return Err(Error::new(
-                        "Expected `Result` object with exactly one entry (`Ok` or `Err`)",
+                        "Expected `Result` object with exactly one entry `Ok` or `Err`",
                     ));
                 }
 
@@ -903,7 +977,10 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
                     "Expected `Result` object with `Ok` or `Err` entry",
                 ))
             }
-            _ => Err(Error::new("Expected `Result` object")),
+            value => Err(Error::new(format!(
+                "Expected `Result` array/tuple/object, found {:?}",
+                value,
+            ))),
         }
     }
 }
@@ -913,121 +990,300 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
 #[cfg(feature = "std")]
 impl Serialize for std::time::Duration {
     fn serialize(&self) -> Result<Value> {
-        let mut values = BTreeMap::new();
+        let mut values = Vec::with_capacity(3);
 
-        values.insert(
+        // See: "Special-type serialization" at the top of this file.
+        values.push(("0".to_string(), Value::Null));
+        values.push((
             "secs".to_string(),
             Value::Number(Number::U64(self.as_secs())),
-        );
-        values.insert(
+        ));
+        values.push((
             "nanos".to_string(),
             Value::Number(Number::U32(self.subsec_nanos())),
-        );
+        ));
 
-        Ok(Value::Object(values))
+        Ok(Value::Struct(values))
     }
 }
 
 #[cfg(feature = "std")]
 impl Deserialize for std::time::Duration {
     fn deserialize(value: Value) -> Result<Self> {
+        let extract_secs = |number: Number| -> Result<u64> {
+            match number {
+                Number::U8(n) => Ok(n as u64),
+                Number::I8(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i8` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::U16(n) => Ok(n as u64),
+                Number::I16(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i16` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::U32(n) => Ok(n as u64),
+                Number::I32(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i32` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::U64(n) => Ok(n),
+                Number::I64(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i64` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::U128(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `u128` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::I128(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i128` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::Usize(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `usize` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::Isize(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `isize` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::F32(n) => {
+                    if n < 0.0 || n.is_infinite() || n.is_nan() {
+                        return Err(Error::new(format!(
+                            "`secs` must be a finite non-negative number: {}",
+                            n
+                        )));
+                    }
+
+                    if n > u64::MAX as f32 {
+                        return Err(Error::new(format!(
+                            "`secs` exceeds the bounds for `Duration`: {}",
+                            n
+                        )));
+                    }
+
+                    Ok(n as u64)
+                }
+                Number::F64(n) => {
+                    if n < 0.0 || n.is_infinite() || n.is_nan() {
+                        return Err(Error::new(format!(
+                            "`secs` must be a finite non-negative number: {}",
+                            n
+                        )));
+                    }
+
+                    if n > u64::MAX as f64 {
+                        return Err(Error::new(format!(
+                            "`secs` exceeds the bounds for `Duration`: {}",
+                            n
+                        )));
+                    }
+
+                    Ok(n as u64)
+                }
+            }
+        };
+        let extract_nanos = |number: Number| -> Result<u32> {
+            match number {
+                Number::U8(n) => Ok(n as u32),
+                Number::I8(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i8` number {} to `u32` for `nanos`",
+                        n,
+                    ))
+                }),
+                Number::U16(n) => Ok(n as u32),
+                Number::I16(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i16` number {} to `u32` for `nanos`",
+                        n,
+                    ))
+                }),
+                Number::U32(n) => Ok(n),
+                Number::I32(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i32` number {} to `u32` for `nanos`",
+                        n,
+                    ))
+                }),
+                Number::U64(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `u64` number {} to `u32` for `nanos`",
+                        n,
+                    ))
+                }),
+                Number::I64(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i64` number {} to `u32` for `nanos`",
+                        n,
+                    ))
+                }),
+                Number::U128(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `u128` number {} to `u32` for `nanos`",
+                        n,
+                    ))
+                }),
+                Number::I128(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `i128` number {} to `u32` for `nanos`",
+                        n,
+                    ))
+                }),
+                Number::Usize(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `usize` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::Isize(n) => n.try_into().map_err(|_| {
+                    Error::new(format!(
+                        "Cannot convert `isize` number {} to `u64` for `secs`",
+                        n,
+                    ))
+                }),
+                Number::F32(n) => {
+                    if n < 0.0 || n.is_infinite() || n.is_nan() {
+                        return Err(Error::new(format!(
+                            "`nanos` must be a finite non-negative number: {}",
+                            n
+                        )));
+                    }
+
+                    if n > u32::MAX as f32 {
+                        return Err(Error::new(format!(
+                            "`nanos` exceeds the bounds for `Duration`: {}",
+                            n
+                        )));
+                    }
+
+                    Ok(n as u32)
+                }
+                Number::F64(n) => {
+                    if n < 0.0 || n.is_infinite() || n.is_nan() {
+                        return Err(Error::new(format!(
+                            "`nanos` must be a finite non-negative number: {}",
+                            n
+                        )));
+                    }
+
+                    if n > u32::MAX as f64 {
+                        return Err(Error::new(format!(
+                            "`nanos` exceeds the bounds for `Duration`: {}",
+                            n
+                        )));
+                    }
+
+                    Ok(n as u32)
+                }
+            }
+        };
+
         match value {
+            Value::Array(mut array) => {
+                if array.len() != 2 {
+                    return Err(Error::new(
+                        "Expected `Duration` array with exactly two items [secs, nanos]",
+                    ));
+                }
+
+                // Pop in reverse order
+                let nanos_value = array
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+                let secs_value = array
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+
+                let secs = match secs_value {
+                    Value::Number(number) => extract_secs(number)?,
+                    _ => {
+                        return Err(Error::new(
+                            "First item of `Duration` array must be a number for `secs`",
+                        ));
+                    }
+                };
+
+                let nanos = match nanos_value {
+                    Value::Number(number) => extract_nanos(number)?,
+                    _ => {
+                        return Err(Error::new(
+                            "Second item of `Duration` array must be a number for `nanos`",
+                        ))
+                    }
+                };
+
+                if nanos >= 1_000_000_000 {
+                    return Err(Error::new("`nanos` must be less than 1,000,000,000"));
+                }
+
+                Ok(std::time::Duration::new(secs, nanos))
+            }
+            Value::Tuple(mut tuple) => {
+                if tuple.len() != 2 {
+                    return Err(Error::new(
+                        "Expected `Duration` tuple with exactly two members (secs, nanos)",
+                    ));
+                }
+
+                // Pop in reverse order
+                let nanos_value = tuple
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+                let secs_value = tuple
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+
+                let secs = match secs_value {
+                    Value::Number(number) => extract_secs(number)?,
+                    _ => {
+                        return Err(Error::new(
+                            "First member of `Duration` tuple must be a number for `secs`",
+                        ));
+                    }
+                };
+
+                let nanos = match nanos_value {
+                    Value::Number(number) => extract_nanos(number)?,
+                    _ => {
+                        return Err(Error::new(
+                            "Second member of `Duration` tuple must be a number for `nanos`",
+                        ))
+                    }
+                };
+
+                if nanos >= 1_000_000_000 {
+                    return Err(Error::new("`nanos` must be less than 1,000,000,000"));
+                }
+
+                Ok(std::time::Duration::new(secs, nanos))
+            }
             Value::Object(mut object) => {
                 if object.len() != 2 {
                     return Err(Error::new(
-                        "Expected `Duration` object with exactly two entries (`secs` and `nanos`)",
+                        "Expected `Duration` object with exactly two entries `secs` and `nanos`",
                     ));
                 }
 
                 let secs = match object.remove("secs") {
-                    Some(Value::Number(number)) => match number {
-                        Number::U8(n) => n as u64,
-                        Number::I8(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i8` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::U16(n) => n as u64,
-                        Number::I16(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i16` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::U32(n) => n as u64,
-                        Number::I32(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i32` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::U64(n) => n,
-                        Number::I64(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i64` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::U128(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `u128` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::I128(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i128` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::Usize(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `usize` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::Isize(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `isize` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::F32(n) => {
-                            if n < 0.0 || n.is_infinite() || n.is_nan() {
-                                return Err(Error::new(format!(
-                                    "`secs` must be a finite non-negative number: {}",
-                                    n
-                                )));
-                            }
-
-                            if n > u64::MAX as f32 {
-                                return Err(Error::new(format!(
-                                    "`secs` exceeds the bounds for `Duration`: {}",
-                                    n
-                                )));
-                            }
-
-                            n as u64
-                        }
-                        Number::F64(n) => {
-                            if n < 0.0 || n.is_infinite() || n.is_nan() {
-                                return Err(Error::new(format!(
-                                    "`secs` must be a finite non-negative number: {}",
-                                    n
-                                )));
-                            }
-
-                            if n > u64::MAX as f64 {
-                                return Err(Error::new(format!(
-                                    "`secs` exceeds the bounds for `Duration`: {}",
-                                    n
-                                )));
-                            }
-
-                            n as u64
-                        }
-                    },
+                    Some(Value::Number(number)) => extract_secs(number)?,
                     _ => {
                         return Err(Error::new(
                             "Expected `Duration` object with a valid numeric `secs` entry",
@@ -1036,99 +1292,7 @@ impl Deserialize for std::time::Duration {
                 };
 
                 let nanos = match object.remove("nanos") {
-                    Some(Value::Number(number)) => match number {
-                        Number::U8(n) => n as u32,
-                        Number::I8(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i8` number {} to `u32` for `nanos`",
-                                n,
-                            ))
-                        })?,
-                        Number::U16(n) => n as u32,
-                        Number::I16(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i16` number {} to `u32` for `nanos`",
-                                n,
-                            ))
-                        })?,
-                        Number::U32(n) => n,
-                        Number::I32(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i32` number {} to `u32` for `nanos`",
-                                n,
-                            ))
-                        })?,
-                        Number::U64(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `u64` number {} to `u32` for `nanos`",
-                                n,
-                            ))
-                        })?,
-                        Number::I64(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i64` number {} to `u32` for `nanos`",
-                                n,
-                            ))
-                        })?,
-                        Number::U128(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `u128` number {} to `u32` for `nanos`",
-                                n,
-                            ))
-                        })?,
-                        Number::I128(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `i128` number {} to `u32` for `nanos`",
-                                n,
-                            ))
-                        })?,
-                        Number::Usize(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `usize` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::Isize(n) => n.try_into().map_err(|_| {
-                            Error::new(format!(
-                                "Cannot convert `isize` number {} to `u64` for `secs`",
-                                n,
-                            ))
-                        })?,
-                        Number::F32(n) => {
-                            if n < 0.0 || n.is_infinite() || n.is_nan() {
-                                return Err(Error::new(format!(
-                                    "`nanos` must be a finite non-negative number: {}",
-                                    n
-                                )));
-                            }
-
-                            if n > u32::MAX as f32 {
-                                return Err(Error::new(format!(
-                                    "`nanos` exceeds the bounds for `Duration`: {}",
-                                    n
-                                )));
-                            }
-
-                            n as u32
-                        }
-                        Number::F64(n) => {
-                            if n < 0.0 || n.is_infinite() || n.is_nan() {
-                                return Err(Error::new(format!(
-                                    "`nanos` must be a finite non-negative number: {}",
-                                    n
-                                )));
-                            }
-
-                            if n > u32::MAX as f64 {
-                                return Err(Error::new(format!(
-                                    "`nanos` exceeds the bounds for `Duration`: {}",
-                                    n
-                                )));
-                            }
-
-                            n as u32
-                        }
-                    },
+                    Some(Value::Number(number)) => extract_nanos(number)?,
                     _ => {
                         return Err(Error::new(
                             "Expected `Duration` object with a valid numeric `nanos` entry",
@@ -1142,7 +1306,7 @@ impl Deserialize for std::time::Duration {
 
                 Ok(std::time::Duration::new(secs, nanos))
             }
-            _ => Err(Error::new("Expected `Duration` object")),
+            _ => Err(Error::new("Expected `Duration` array/tuple/object")),
         }
     }
 }
@@ -1271,10 +1435,10 @@ macro_rules! impl_for_struct {
             fn serialize(&self) -> $crate::internal::Result<$crate::internal::Value> {
                 const EXPECTED_LEN: usize = 0 $(+ { let _ = stringify!($field_name); 1 })*;
 
-                let mut fields = $crate::internal::sys::Vec::with_capacity(EXPECTED_LEN);
+                let mut values = $crate::internal::sys::Vec::with_capacity(EXPECTED_LEN);
 
                 $(
-                    fields.push(
+                    values.push(
                         (
                             $crate::internal::utils::unescape_identifier(
                                 stringify!($field_name)
@@ -1284,7 +1448,7 @@ macro_rules! impl_for_struct {
                     );
                 )*
 
-                Ok($crate::internal::Value::Struct(fields))
+                Ok($crate::internal::Value::Struct(values))
             }
         }
 
