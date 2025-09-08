@@ -1,3 +1,7 @@
+// TODO: The special-type serialization part probably needs to do some additional stuff like
+// flattening for certain type values (e.g. single-member tuple like `IpAddr` that has full string
+// for string encoding but array of numbers for binary encoding)
+
 use celkit_core::internal::sys::*;
 
 fn escape_text(input: &str) -> String {
@@ -166,6 +170,19 @@ mod mini {
         }
 
         fn encode_struct(&self, value: &Vec<(String, Value)>) -> Result<String> {
+            // Check for special types with discriminant
+            if let Some((field_name, _)) = value.first() {
+                if field_name == "0" {
+                    let values = value
+                        .iter()
+                        .filter(|(key, _)| key != "0" && !key.is_empty())
+                        .map(|(key, value)| (key.clone(), value.clone()))
+                        .collect();
+
+                    return self.encode_object(&values);
+                }
+            }
+
             let fields: Result<Vec<String>> = value
                 .iter()
                 .map(|field| {
@@ -724,7 +741,7 @@ mod pretty {
             &self,
             value: &Vec<(String, Value)>,
             depth: usize,
-            _available_line_length: Option<usize>,
+            available_line_length: Option<usize>,
         ) -> Result<String> {
             if value.is_empty() {
                 return Ok(format!(
@@ -733,6 +750,19 @@ mod pretty {
                     Token::TupleOpen,
                     Token::TupleClose
                 ));
+            }
+
+            // Check for special types with discriminant
+            if let Some((field_name, _)) = value.first() {
+                if field_name == "0" {
+                    let values = value
+                        .iter()
+                        .filter(|(key, _)| key != "0" && !key.is_empty())
+                        .map(|(key, value)| (key.clone(), value.clone()))
+                        .collect();
+
+                    return self.encode_object(&values, depth, available_line_length);
+                }
             }
 
             let current_indent = self.indent(depth);
