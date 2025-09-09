@@ -1012,8 +1012,8 @@ impl<T: Serialize, E: Serialize> Serialize for core::result::Result<T, E> {
 impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> {
     fn deserialize(value: Value) -> Result<Self> {
         match value {
-            Value::Array(mut tuple) => {
-                if tuple.len() != 2 {
+            Value::Array(mut array) => {
+                if array.len() != 2 {
                     return Err(Error::new(
                         "Expected `Result` array with exactly two items [discriminant, value] \
                         e.g. [{1/0}, value]",
@@ -1021,10 +1021,10 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
                 }
 
                 // Pop in reverse order
-                let value = tuple
+                let value = array
                     .pop()
                     .expect("This SHOULD never happen because of length check!");
-                let discriminant = tuple
+                let discriminant = array
                     .pop()
                     .expect("This SHOULD never happen because of length check!");
 
@@ -1529,6 +1529,93 @@ impl Deserialize for core::net::IpAddr {
                 }
             }
             _ => Err(Error::new("Expected `IpAddr` array/tuple/string")),
+        }
+    }
+}
+
+// -------------------------------- Range --------------------------------- //
+
+impl<T: Serialize> Serialize for core::ops::Range<T> {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = Vec::with_capacity(3);
+
+        // See: "Special-type serialization" at the top of this file
+        values.push(("0".to_string(), Value::Null));
+        values.push(("start".to_string(), self.start.serialize()?));
+        values.push(("end".to_string(), self.end.serialize()?));
+
+        Ok(Value::Struct(values))
+    }
+}
+
+impl<T: Deserialize> Deserialize for core::ops::Range<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Array(mut array) => {
+                if array.len() != 2 {
+                    return Err(Error::new(
+                        "Expected `Range` array with exactly two items [start, end]",
+                    ));
+                }
+
+                // Pop in reverse order
+                let end = array
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+                let start = array
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+
+                Ok(core::ops::Range {
+                    start: T::deserialize(start)?,
+                    end: T::deserialize(end)?,
+                })
+            }
+            Value::Tuple(mut tuple) => {
+                if tuple.len() != 2 {
+                    return Err(Error::new(
+                        "Expected `Range` tuple with exactly two members (start, end)",
+                    ));
+                }
+
+                // Pop in reverse order
+                let end = tuple
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+                let start = tuple
+                    .pop()
+                    .expect("This SHOULD never happen because of length check!");
+
+                Ok(core::ops::Range {
+                    start: T::deserialize(start)?,
+                    end: T::deserialize(end)?,
+                })
+            }
+            Value::Object(mut object) => {
+                if object.len() != 2 {
+                    return Err(Error::new(
+                        "Expected `Range` object with exactly two entries `start` and `end`",
+                    ));
+                }
+
+                let Some(start) = object.remove("start") else {
+                    return Err(Error::new(
+                        "Expected `Range` object with a valid `start` entry",
+                    ));
+                };
+
+                let Some(end) = object.remove("end") else {
+                    return Err(Error::new(
+                        "Expected `Range` object with a valid `end` entry",
+                    ));
+                };
+
+                Ok(core::ops::Range {
+                    start: T::deserialize(start)?,
+                    end: T::deserialize(end)?,
+                })
+            }
+            _ => Err(Error::new("Expected `Range` array/tuple/object")),
         }
     }
 }
