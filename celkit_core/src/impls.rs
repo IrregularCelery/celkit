@@ -1414,6 +1414,31 @@ impl Deserialize for std::time::Duration {
     }
 }
 
+// ----------------------------- SystemTime ------------------------------- //
+
+#[cfg(feature = "std")]
+impl Serialize for std::time::SystemTime {
+    fn serialize(&self) -> Result<Value> {
+        self.duration_since(std::time::UNIX_EPOCH)
+            .map_err(|value| {
+                Error::new(format!(
+                    "`SystemTime` value must be after `UNIX_EPOCH`, got {}",
+                    value
+                ))
+            })?
+            .serialize()
+    }
+}
+
+#[cfg(feature = "std")]
+impl Deserialize for std::time::SystemTime {
+    fn deserialize(value: Value) -> Result<Self> {
+        let duration = std::time::Duration::deserialize(value)?;
+
+        Ok(std::time::UNIX_EPOCH + duration)
+    }
+}
+
 // ------------------------------- IpAddr --------------------------------- //
 
 impl Serialize for core::net::IpAddr {
