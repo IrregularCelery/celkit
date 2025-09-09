@@ -1,15 +1,26 @@
 // NOTE:
+//
 // Special-type serialization
-// The "0" field is a marker indicating this "struct" is special and must be handled differently
-// by encoders.
-// "0" is safe because struct field names cannot start with a non-alphabetic character, so it
-// will never conflict with user-defined fields.
-// The remaining fields carry the actual values. Depending on the encoder, they may be used
-// differently:
-// - String encoders: use field names as-is ("Ok", "secs", ...).
-// - Binary encoders: ignore field names and only encode the values in order.
-// Empty field names can be used for type-specific discriminants
-// (e.g. distinguishing Result::Ok vs Result::Err) when the names are ignored.
+//
+// Some special types (e.g. Result, Duration) are represented as structs with reserved field names
+// that tell encoders how to handle them.
+//
+// Reserved field names:
+// - "0": A marker indicating the struct is "special" and must be handled differently by encoders.
+//   (This field is always present in special structs)
+// - "#": Type-specific discriminants or values that are ignored by verbose encoders (e.g. string),
+//   but kept by data-only encoders (e.g. binary).
+//   If only one such field exists, it can be flattened instead of wrapped.
+// - "%": Values that are the opposite of "#"; they are ignored by data-only encoders (e.g. binary),
+//   but kept by verbose encoders (e.g. string).
+//   If only one such field exists, it can be flattened instead of wrapped.
+// - Normal names ("Ok", "secs", ...): Used by verbose encoders. For data-only encoders, the names
+//   are ignored, but the values are kept in positional order.
+//
+// This design ensures any encoder can have access to necessary values and data while having the
+// ability to ignore data that is unnecessary to them.
+//
+// The "0", "#", and "%" names were chosen to guarantee no conflicts with user-defined field names.
 
 use crate::core::{Deserialize, Serialize};
 use crate::internal::sys::*;
@@ -870,6 +881,7 @@ impl<T: Deserialize + core::hash::Hash + Eq> Deserialize for std::collections::H
         }
     }
 }
+
 // -------------------------------- Tuple --------------------------------- //
 
 impl Serialize for () {
@@ -979,16 +991,16 @@ impl<T: Serialize, E: Serialize> Serialize for core::result::Result<T, E> {
     fn serialize(&self) -> Result<Value> {
         let mut values = Vec::with_capacity(3);
 
-        // See: "Special-type serialization" at the top of this file.
+        // See: "Special-type serialization" at the top of this file
         values.push(("0".to_string(), Value::Null));
 
         match self {
             Ok(ok) => {
-                values.push((String::new(), Value::Number(Number::U8(1))));
+                values.push(("#".to_string(), Value::Number(Number::U8(1))));
                 values.push(("Ok".to_string(), ok.serialize()?));
             }
             Err(err) => {
-                values.push((String::new(), Value::Number(Number::U8(0))));
+                values.push(("#".to_string(), Value::Number(Number::U8(0))));
                 values.push(("Err".to_string(), err.serialize()?));
             }
         };
@@ -1071,10 +1083,7 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
                     "Expected `Result` object with `Ok` or `Err` entry",
                 ))
             }
-            value => Err(Error::new(format!(
-                "Expected `Result` array/tuple/object, found {:?}",
-                value,
-            ))),
+            _ => Err(Error::new("Expected `Result` array/tuple/object")),
         }
     }
 }
@@ -1086,7 +1095,7 @@ impl Serialize for std::time::Duration {
     fn serialize(&self) -> Result<Value> {
         let mut values = Vec::with_capacity(3);
 
-        // See: "Special-type serialization" at the top of this file.
+        // See: "Special-type serialization" at the top of this file
         values.push(("0".to_string(), Value::Null));
         values.push((
             "secs".to_string(),
@@ -1401,6 +1410,100 @@ impl Deserialize for std::time::Duration {
                 Ok(std::time::Duration::new(secs, nanos))
             }
             _ => Err(Error::new("Expected `Duration` array/tuple/object")),
+        }
+    }
+}
+
+// ------------------------------- IpAddr --------------------------------- //
+
+impl Serialize for core::net::IpAddr {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = Vec::with_capacity(3);
+
+        // See: "Special-type serialization" at the top of this file
+        values.push(("0".to_string(), Value::Null));
+        values.push((
+            "#".to_string(),
+            Value::Array({
+                match self {
+                    core::net::IpAddr::V4(v4) => v4
+                        .octets()
+                        .iter()
+                        .map(|b| Value::Number(Number::U8(*b)))
+                        .collect(),
+                    core::net::IpAddr::V6(v6) => v6
+                        .octets()
+                        .iter()
+                        .map(|b| Value::Number(Number::U8(*b)))
+                        .collect(),
+                }
+            }),
+        ));
+        values.push(("%".to_string(), Value::Text(self.to_string())));
+
+        Ok(Value::Struct(values))
+    }
+}
+
+impl Deserialize for core::net::IpAddr {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Text(string) => string
+                .parse()
+                .map_err(|e| Error::new(format!("Invalid IP address: {}", e))),
+            Value::Array(array) => {
+                let bytes: Vec<u8> = array
+                    .iter()
+                    .map(|value| match value {
+                        Value::Number(Number::U8(n)) => Ok(*n),
+                        _ => Err(Error::new("Expected number `IpAddr` array item")),
+                    })
+                    .collect::<Result<_>>()?;
+
+                match bytes.len() {
+                    4 => Ok(core::net::IpAddr::V4(core::net::Ipv4Addr::new(
+                        bytes[0], bytes[1], bytes[2], bytes[3],
+                    ))),
+                    16 => {
+                        let mut array = [0u8; 16];
+
+                        array.copy_from_slice(&bytes);
+
+                        Ok(core::net::IpAddr::V6(core::net::Ipv6Addr::from(array)))
+                    }
+                    len => Err(Error::new(format!(
+                        "Expected `IpAddr` array with exactly 4 (v4) or 16 (v6) items, got {}",
+                        len
+                    ))),
+                }
+            }
+            Value::Tuple(tuple) => {
+                let bytes: Vec<u8> = tuple
+                    .iter()
+                    .map(|value| match value {
+                        Value::Number(Number::U8(n)) => Ok(*n),
+                        _ => Err(Error::new("Expected number `IpAddr` tuple member")),
+                    })
+                    .collect::<Result<_>>()?;
+
+                match bytes.len() {
+                    4 => Ok(core::net::IpAddr::V4(core::net::Ipv4Addr::new(
+                        bytes[0], bytes[1], bytes[2], bytes[3],
+                    ))),
+                    16 => {
+                        let mut array = [0u8; 16];
+
+                        array.copy_from_slice(&bytes);
+
+                        Ok(core::net::IpAddr::V6(core::net::Ipv6Addr::from(array)))
+                    }
+                    len => Err(Error::new(format!(
+                        "Expected `IpAddr` tuple with exactly 4 (v4) or 16 (v6) members, got {}",
+                        len
+                    ))),
+                }
+            }
+            _ => Err(Error::new("Expected `IpAddr` array/tuple/string")),
         }
     }
 }

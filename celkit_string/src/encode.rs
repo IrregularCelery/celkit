@@ -1,7 +1,3 @@
-// TODO: The special-type serialization part probably needs to do some additional stuff like
-// flattening for certain type values (e.g. single-member tuple like `IpAddr` that has full string
-// for string encoding but array of numbers for binary encoding)
-
 use celkit_core::internal::sys::*;
 
 fn escape_text(input: &str) -> String {
@@ -171,16 +167,28 @@ mod mini {
 
         fn encode_struct(&self, value: &Vec<(String, Value)>) -> Result<String> {
             // Check for special types with discriminant
-            if let Some((field_name, _)) = value.first() {
-                if field_name == "0" {
-                    let values = value
-                        .iter()
-                        .filter(|(key, _)| key != "0" && !key.is_empty())
-                        .map(|(key, value)| (key.clone(), value.clone()))
-                        .collect();
+            // See: "Special-type serialization" in `celkit_core::impls.rs`
+            if matches!(value.first(), Some((field_name, _)) if field_name == "0") {
+                let values: BTreeMap<_, _> = value
+                    .iter()
+                    .filter(
+                        |(key, _)| key != "0" /* marker */ && key != "#", /* data-only field */
+                    )
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect();
 
-                    return self.encode_object(&values);
+                // If there's only one value with key "%", flatten it instead of wrapping
+                if values.len() == 1 {
+                    if let Some((key, value)) = values.iter().next() {
+                        if key == "%"
+                        /* verbose-only */
+                        {
+                            return self.encode_value(value);
+                        }
+                    }
                 }
+
+                return self.encode_object(&values);
             }
 
             let fields: Result<Vec<String>> = value
@@ -753,16 +761,28 @@ mod pretty {
             }
 
             // Check for special types with discriminant
-            if let Some((field_name, _)) = value.first() {
-                if field_name == "0" {
-                    let values = value
-                        .iter()
-                        .filter(|(key, _)| key != "0" && !key.is_empty())
-                        .map(|(key, value)| (key.clone(), value.clone()))
-                        .collect();
+            // See: "Special-type serialization" in `celkit_core::impls.rs`
+            if matches!(value.first(), Some((field_name, _)) if field_name == "0") {
+                let values: BTreeMap<_, _> = value
+                    .iter()
+                    .filter(
+                        |(key, _)| key != "0" /* marker */ && key != "#", /* data-only field */
+                    )
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect();
 
-                    return self.encode_object(&values, depth, available_line_length);
+                // If there's only one value with key "%", flatten it instead of wrapping
+                if values.len() == 1 {
+                    if let Some((key, value)) = values.iter().next() {
+                        if key == "%"
+                        /* verbose-only */
+                        {
+                            return self.encode_value(value, depth, available_line_length);
+                        }
+                    }
                 }
+
+                return self.encode_object(&values, depth, available_line_length);
             }
 
             let current_indent = self.indent(depth);
