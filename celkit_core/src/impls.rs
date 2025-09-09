@@ -1620,6 +1620,29 @@ impl<T: Deserialize> Deserialize for core::ops::Range<T> {
     }
 }
 
+// --------------------------- RangeInclusive ----------------------------- //
+
+impl<T: Serialize> Serialize for core::ops::RangeInclusive<T> {
+    fn serialize(&self) -> Result<Value> {
+        let mut values = Vec::with_capacity(3);
+
+        // See: "Special-type serialization" at the top of this file
+        values.push(("0".to_string(), Value::Null));
+        values.push(("start".to_string(), self.start().serialize()?));
+        values.push(("end".to_string(), self.end().serialize()?));
+
+        Ok(Value::Struct(values))
+    }
+}
+
+impl<T: Deserialize> Deserialize for core::ops::RangeInclusive<T> {
+    fn deserialize(value: Value) -> Result<Self> {
+        let range = core::ops::Range::<T>::deserialize(value)?;
+
+        Ok(range.start..=range.end)
+    }
+}
+
 // --------------------------------- Box ---------------------------------- //
 
 impl<T: Serialize> Serialize for Box<T> {
