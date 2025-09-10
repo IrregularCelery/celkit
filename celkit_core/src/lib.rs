@@ -4,7 +4,6 @@ extern crate alloc;
 
 mod core;
 mod impls;
-mod utils;
 
 pub use core::{Deserialize, Serialize};
 
@@ -17,9 +16,5 @@ pub mod internal {
         pub use alloc::format;
         pub use alloc::string::{String, ToString};
         pub use alloc::vec::Vec;
-    }
-
-    pub mod utils {
-        pub use crate::utils::unescape_identifier;
     }
 }

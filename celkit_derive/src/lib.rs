@@ -51,6 +51,24 @@ fn insert_trait_bounds(mut generics: syn::Generics, trait_name: &str) -> syn::Ge
     generics
 }
 
+fn unescape_identifier(identifier: &str) -> String {
+    if !identifier.starts_with("r#") {
+        return identifier.to_string();
+    }
+
+    let unescaped = &identifier[2..];
+
+    match unescaped {
+        "abstract" | "as" | "async" | "await" | "become" | "box" | "break" | "const"
+        | "continue" | "crate" | "do" | "dyn" | "else" | "enum" | "extern" | "false" | "final"
+        | "fn" | "for" | "gen" | "if" | "impl" | "in" | "let" | "loop" | "macro" | "match"
+        | "mod" | "move" | "mut" | "override" | "priv" | "pub" | "ref" | "return" | "static"
+        | "struct" | "super" | "trait" | "true" | "try" | "type" | "typeof" | "unsafe"
+        | "unsized" | "use" | "virtual" | "where" | "while" | "yield" => unescaped.to_string(),
+        _ => identifier.to_string(),
+    }
+}
+
 // ------------------------ Struct Serialization -------------------------- //
 
 fn generate_named_struct_serialize(
@@ -65,9 +83,11 @@ fn generate_named_struct_serialize(
                 .to_compile_error();
         };
 
+        let field_name_str = unescape_identifier(&field_name.to_string());
+
         quote::quote! {
             fields.push((
-                ::celkit::core::utils::unescape_identifier(stringify!(#field_name)).to_string(),
+                #field_name_str.to_string(),
                 self.#field_name.serialize()?
             ));
         }
@@ -185,10 +205,12 @@ fn generate_named_struct_deserialize(
         };
     }
 
+    let field_names_str: Vec<String> = field_names
+        .iter()
+        .map(|field_name| unescape_identifier(&field_name.to_string()).to_string())
+        .collect();
     let expected_fields_array = quote::quote! {
-        let expected_fields = [
-            #(::celkit::core::utils::unescape_identifier(stringify!(#field_names))),*
-        ];
+        let expected_fields = [#(#field_names_str),*];
     };
     let field_declarations =
         field_names
@@ -204,10 +226,10 @@ fn generate_named_struct_deserialize(
             .iter()
             .zip(field_types.iter())
             .map(|(field_name, field_type)| {
+                let field_name_str = unescape_identifier(&field_name.to_string());
+
                 quote::quote! {
-                    if field_name
-                        == ::celkit::core::utils::unescape_identifier(stringify!(#field_name))
-                    {
+                    if field_name == #field_name_str {
                         #field_name = Some(<#field_type>::deserialize(field_value)?);
 
                         continue;
@@ -215,11 +237,13 @@ fn generate_named_struct_deserialize(
                 }
             });
     let field_assignments = field_names.iter().map(|field_name| {
+        let field_name_str = unescape_identifier(&field_name.to_string());
+
         quote::quote! {
             let #field_name = #field_name.ok_or_else(|| {
                 ::celkit::core::Error::new(format!(
                     "Missing `{}` field in `{}`",
-                    ::celkit::core::utils::unescape_identifier(stringify!(#field_name)),
+                    #field_name_str,
                     stringify!(#name),
                 ))
             })?;
@@ -230,13 +254,15 @@ fn generate_named_struct_deserialize(
             .iter()
             .zip(field_types.iter())
             .map(|(field_name, field_type)| {
+                let field_name_str = unescape_identifier(&field_name.to_string());
+
                 quote::quote! {
                     let #field_name = {
                         let (_, field_value) = fields_iter
                             .next()
                             .ok_or_else(|| ::celkit::core::Error::new(format!(
                                 "Missing field `{}` in positional deserialization of struct `{}`",
-                                ::celkit::core::utils::unescape_identifier(stringify!(#field_name)),
+                                #field_name_str,
                                 stringify!(#name),
                             )))?;
 
@@ -413,9 +439,11 @@ fn generate_named_enum_serialize(
         .filter_map(|f| f.ident.as_ref())
         .collect();
     let fields = field_names.iter().map(|field_name| {
+        let field_name_str = unescape_identifier(&field_name.to_string());
+
         quote::quote! {
             fields.push((
-                ::celkit::core::utils::unescape_identifier(stringify!(#field_name)).to_string(),
+                #field_name_str.to_string(),
                 #field_name.serialize()?
             ));
         }
@@ -561,10 +589,12 @@ fn generate_named_enum_deserialize(
         };
     }
 
+    let field_names_str: Vec<String> = field_names
+        .iter()
+        .map(|field_name| unescape_identifier(&field_name.to_string()).to_string())
+        .collect();
     let expected_fields_array = quote::quote! {
-        let expected_fields = [
-            #(::celkit::core::utils::unescape_identifier(stringify!(#field_names))),*
-        ];
+        let expected_fields = [#(#field_names_str),*];
     };
     let field_declarations =
         field_names
@@ -580,10 +610,10 @@ fn generate_named_enum_deserialize(
             .iter()
             .zip(field_types.iter())
             .map(|(field_name, field_type)| {
+                let field_name_str = unescape_identifier(&field_name.to_string());
+
                 quote::quote! {
-                    if field_name
-                        == ::celkit::core::utils::unescape_identifier(stringify!(#field_name))
-                    {
+                    if field_name == #field_name_str {
                         #field_name = Some(<#field_type>::deserialize(field_value)?);
 
                         continue;
@@ -591,11 +621,13 @@ fn generate_named_enum_deserialize(
                 }
             });
     let field_assignments = field_names.iter().map(|field_name| {
+        let field_name_str = unescape_identifier(&field_name.to_string());
+
         quote::quote! {
             let #field_name = #field_name.ok_or_else(|| {
                 ::celkit::core::Error::new(format!(
                     "Missing field `{}` in variant `{}`",
-                    ::celkit::core::utils::unescape_identifier(stringify!(#field_name)),
+                    #field_name_str,
                     stringify!(#variant_name),
                 ))
             })?;
@@ -606,13 +638,15 @@ fn generate_named_enum_deserialize(
             .iter()
             .zip(field_types.iter())
             .map(|(field_name, field_type)| {
+                let field_name_str = unescape_identifier(&field_name.to_string());
+
                 quote::quote! {
                     let #field_name = {
                         let (_, field_value) = fields_iter
                             .next()
                             .ok_or_else(|| ::celkit::core::Error::new(format!(
                                 "Missing field `{}` in positional deserialization of variant `{}`",
-                                ::celkit::core::utils::unescape_identifier(stringify!(#field_name)),
+                                #field_name_str,
                                 stringify!(#variant_name),
                             )))?;
 
