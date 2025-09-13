@@ -1,12 +1,197 @@
-// TODO: Add `container` and `field` attributes
-#[proc_macro_derive(Serialize)]
+enum CaseStyle {
+    Lower,
+    Upper,
+    Camel,
+    Pascal,
+    Snake,
+    ScreamingSnake,
+    Kebab,
+    ScreamingKebab,
+}
+
+impl CaseStyle {
+    const fn get_styles() -> [&'static str; 8] {
+        [
+            "lowercase",
+            "UPPERCASE",
+            "camelCase",
+            "PascalCase",
+            "snake_case",
+            "SCREAMING_SNAKE_CASE",
+            "kebab-case",
+            "SCREAMING-KEBAB-CASE",
+        ]
+    }
+
+    fn split_words(input: &str) -> Vec<String> {
+        if input.is_empty() {
+            return Vec::new();
+        }
+
+        let mut words = Vec::new();
+        let mut current_word = String::new();
+        let chars: Vec<char> = input.chars().collect();
+
+        for (i, &c) in chars.iter().enumerate() {
+            match c {
+                '_' | '-' | ' ' => {
+                    if !current_word.is_empty() {
+                        words.push(current_word);
+
+                        current_word = String::new();
+                    }
+                }
+                c if c.is_uppercase() => {
+                    if !current_word.is_empty() && (i == 0 || chars[i - 1].is_lowercase()) {
+                        words.push(current_word);
+
+                        current_word = String::new();
+                    }
+
+                    current_word.push(c.to_lowercase().next().unwrap_or(c));
+                }
+                c => {
+                    current_word.push(c);
+                }
+            }
+        }
+
+        if !current_word.is_empty() {
+            words.push(current_word);
+        }
+
+        words
+    }
+
+    fn from_str(input: &str) -> Option<Self> {
+        match input {
+            "lower" | "lowercase" => Some(CaseStyle::Lower),
+            "upper" | "UPPERCASE" => Some(CaseStyle::Upper),
+            "camel" | "camelCase" => Some(CaseStyle::Camel),
+            "pascal" | "PascalCase" => Some(CaseStyle::Pascal),
+            "snake" | "snake_case" => Some(CaseStyle::Snake),
+            "screaming_snake" | "SCREAMING_SNAKE_CASE" => Some(CaseStyle::ScreamingSnake),
+            "kebab" | "kebab-case" => Some(CaseStyle::Kebab),
+            "screaming_kebab" | "SCREAMING-KEBAB-CASE" => Some(CaseStyle::ScreamingKebab),
+            _ => None,
+        }
+    }
+
+    fn to_lower_case(&self, input: &str) -> String {
+        input.to_lowercase()
+    }
+
+    fn to_upper_case(&self, input: &str) -> String {
+        input.to_uppercase()
+    }
+
+    fn to_camel_case(&self, input: &str) -> String {
+        let words = Self::split_words(input);
+
+        if words.is_empty() {
+            return String::new();
+        }
+
+        let mut output = String::with_capacity(input.len());
+
+        // First word is lowercase
+        output.push_str(&words[0].to_lowercase());
+
+        // The rest of the words are capitalized
+        for word in &words[1..] {
+            if let Some(first_char) = word.chars().next() {
+                output.push(first_char.to_uppercase().next().unwrap_or(first_char));
+                output.push_str(&word[1..].to_lowercase());
+            }
+        }
+
+        output
+    }
+
+    fn to_pascal_case(&self, input: &str) -> String {
+        let words = Self::split_words(input);
+        let mut output = String::with_capacity(input.len());
+
+        // All words are capitalized
+        for word in words {
+            if let Some(first_char) = word.chars().next() {
+                output.push(first_char.to_uppercase().next().unwrap_or(first_char));
+                output.push_str(&word[1..].to_lowercase());
+            }
+        }
+
+        output
+    }
+
+    fn to_snake_case(&self, input: &str) -> String {
+        let words = Self::split_words(input);
+
+        words.join("_").to_lowercase()
+    }
+
+    fn to_screaming_snake_case(&self, input: &str) -> String {
+        let words = Self::split_words(input);
+
+        words.join("_").to_uppercase()
+    }
+
+    fn to_kebab_case(&self, input: &str) -> String {
+        let words = Self::split_words(input);
+
+        words.join("-").to_lowercase()
+    }
+
+    fn to_screaming_kebab_case(&self, input: &str) -> String {
+        let words = Self::split_words(input);
+
+        words.join("-").to_uppercase()
+    }
+
+    fn convert(&self, input: &str) -> String {
+        match self {
+            CaseStyle::Lower => self.to_lower_case(input),
+            CaseStyle::Upper => self.to_upper_case(input),
+            CaseStyle::Camel => self.to_camel_case(input),
+            CaseStyle::Pascal => self.to_pascal_case(input),
+            CaseStyle::Snake => self.to_snake_case(input),
+            CaseStyle::ScreamingSnake => self.to_screaming_snake_case(input),
+            CaseStyle::Kebab => self.to_kebab_case(input),
+            CaseStyle::ScreamingKebab => self.to_screaming_kebab_case(input),
+        }
+    }
+}
+
+#[derive(Default)]
+struct ContainerAttributes {
+    rename_all: Option<CaseStyle>,
+}
+
+#[derive(Default)]
+struct FieldAttributes {
+    rename: Option<String>,
+    alias: Vec<String>,
+    default: bool,
+    skip: bool,
+    skip_serializing: bool,
+    skip_deserializing: bool,
+}
+
+#[proc_macro_derive(Serialize, attributes(celkit))]
 pub fn derive_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     let name = &input.ident;
     let generics = input.generics;
+    let attributes = &input.attrs;
+
+    let container_attributes = match parse_container_attributes(attributes) {
+        Ok(attributes) => attributes,
+        Err(e) => return e.to_compile_error().into(),
+    };
 
     let impl_serialize = match &input.data {
-        syn::Data::Struct(data) => generate_struct_serialize(name, generics, data),
+        syn::Data::Struct(data) => {
+            generate_struct_serialize(name, generics, data, &container_attributes)
+        }
         syn::Data::Enum(data) => generate_enum_serialize(name, generics, data),
         syn::Data::Union(_) => {
             return syn::Error::new_spanned(name, "Serialization isn't available for unions")
@@ -18,14 +203,22 @@ pub fn derive_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     proc_macro::TokenStream::from(impl_serialize)
 }
 
-#[proc_macro_derive(Deserialize)]
+#[proc_macro_derive(Deserialize, attributes(celkit))]
 pub fn derive_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     let name = &input.ident;
     let generics = input.generics;
+    let attributes = &input.attrs;
+
+    let container_attributes = match parse_container_attributes(attributes) {
+        Ok(attributes) => attributes,
+        Err(e) => return e.to_compile_error().into(),
+    };
 
     let impl_deserialize = match &input.data {
-        syn::Data::Struct(data) => generate_struct_deserialize(name, generics, data),
+        syn::Data::Struct(data) => {
+            generate_struct_deserialize(name, generics, data, &container_attributes)
+        }
         syn::Data::Enum(data) => generate_enum_deserialize(name, generics, data),
         syn::Data::Union(_) => {
             return syn::Error::new_spanned(name, "Serialization isn't available for unions")
@@ -69,21 +262,168 @@ fn unescape_identifier(identifier: &str) -> String {
     }
 }
 
+fn parse_container_attributes(attributes: &[syn::Attribute]) -> syn::Result<ContainerAttributes> {
+    let mut container_attributes = ContainerAttributes::default();
+
+    for attribute in attributes {
+        if !attribute.path().is_ident("celkit") {
+            continue;
+        }
+
+        attribute.parse_nested_meta(|meta| {
+            if let Some(path) = meta.path.get_ident() {
+                return match path.to_string().as_str() {
+                    "rename_all" => {
+                        let value = meta.value()?;
+                        let s: syn::LitStr = value.parse()?;
+                        let case_style = CaseStyle::from_str(&s.value());
+
+                        if case_style.is_none() {
+                            return Err(meta.error(format!(
+                                "Unknown case style, Available styles: {}",
+                                CaseStyle::get_styles().join(", ")
+                            )));
+                        }
+
+                        container_attributes.rename_all = case_style;
+
+                        Ok(())
+                    }
+                    unknown => Err(meta.error(format!(
+                        "Unknown `celkit` container attribute `{}`",
+                        unknown
+                    ))),
+                };
+            }
+
+            Err(meta.error(format!(
+                "Unknown `celkit` container attribute `{}`",
+                quote::ToTokens::to_token_stream(&meta.path)
+                    .to_string()
+                    .replace(' ', "")
+            )))
+        })?;
+    }
+
+    Ok(container_attributes)
+}
+
+fn parse_field_attributes(attributes: &[syn::Attribute]) -> syn::Result<FieldAttributes> {
+    let mut field_attributes = FieldAttributes::default();
+
+    for attribute in attributes {
+        if !attribute.path().is_ident("celkit") {
+            continue;
+        }
+
+        attribute.parse_nested_meta(|meta| {
+            if let Some(path) = meta.path.get_ident() {
+                return match path.to_string().as_str() {
+                    "rename" => {
+                        let value = meta.value()?;
+                        let s: syn::LitStr = value.parse()?;
+
+                        field_attributes.rename = Some(s.value());
+
+                        Ok(())
+                    }
+                    "alias" => {
+                        let value = meta.value()?;
+                        let s: syn::LitStr = value.parse()?;
+
+                        field_attributes.alias.push(s.value());
+
+                        Ok(())
+                    }
+                    "default" => {
+                        field_attributes.default = true;
+
+                        Ok(())
+                    }
+                    "skip" => {
+                        field_attributes.skip = true;
+
+                        Ok(())
+                    }
+                    "skip_serializing" => {
+                        field_attributes.skip_serializing = true;
+
+                        Ok(())
+                    }
+                    "skip_deserializing" => {
+                        field_attributes.skip_deserializing = true;
+
+                        Ok(())
+                    }
+                    unknown => {
+                        Err(meta.error(format!("Unknown `celkit` field attribute `{}`", unknown)))
+                    }
+                };
+            }
+
+            Err(meta.error(format!(
+                "Unknown `celkit` field attribute `{}`",
+                quote::ToTokens::to_token_stream(&meta.path)
+                    .to_string()
+                    .replace(' ', "")
+            )))
+        })?;
+    }
+
+    Ok(field_attributes)
+}
+
+fn get_field_name(
+    field_name: &str,
+    field_attributes: &FieldAttributes,
+    container_attributes: &ContainerAttributes,
+) -> String {
+    if let Some(ref rename) = field_attributes.rename {
+        return rename.clone();
+    }
+
+    let unescaped = unescape_identifier(field_name);
+
+    if let Some(ref rename_all) = container_attributes.rename_all {
+        return rename_all.convert(&unescaped);
+    }
+
+    unescaped
+}
+
 // ------------------------ Struct Serialization -------------------------- //
 
 fn generate_named_struct_serialize(
     name: &syn::Ident,
     generics: syn::Generics,
     fields: &syn::FieldsNamed,
+    container_attributes: &ContainerAttributes,
 ) -> proc_macro2::TokenStream {
-    let field_count = fields.named.len();
-    let fields = fields.named.iter().map(|field| {
+    let serializable_fields: Vec<_> = fields
+        .named
+        .iter()
+        .filter_map(|field| {
+            let field_attributes = parse_field_attributes(&field.attrs).ok()?;
+
+            if field_attributes.skip || field_attributes.skip_serializing {
+                return None;
+            }
+
+            Some((field, field_attributes))
+        })
+        .collect();
+    let field_count = serializable_fields.len();
+    let fields = serializable_fields.iter().map(|(field, field_attributes)| {
         let Some(field_name) = &field.ident else {
-            return syn::Error::new_spanned(field, "Named field must have an identifier")
+            return syn::Error::new_spanned(field, "Named field must have an `identifier`")
                 .to_compile_error();
         };
 
-        let field_name_str = unescape_identifier(&field_name.to_string());
+        let field_name_str = get_field_name(
+            &field_name.to_string(),
+            field_attributes,
+            container_attributes,
+        );
 
         quote::quote! {
             fields.push((
@@ -163,11 +503,14 @@ fn generate_struct_serialize(
     name: &syn::Ident,
     generics: syn::Generics,
     data: &syn::DataStruct,
+    container_attributes: &ContainerAttributes,
 ) -> proc_macro2::TokenStream {
     let fields = &data.fields;
 
     match fields {
-        syn::Fields::Named(fields) => generate_named_struct_serialize(name, generics, fields),
+        syn::Fields::Named(fields) => {
+            generate_named_struct_serialize(name, generics, fields, container_attributes)
+        }
         syn::Fields::Unnamed(fields) => generate_unnamed_struct_serialize(name, generics, fields),
         syn::Fields::Unit => generate_unit_struct_serialize(name, generics),
     }
@@ -179,6 +522,7 @@ fn generate_named_struct_deserialize(
     name: &syn::Ident,
     generics: syn::Generics,
     fields: &syn::FieldsNamed,
+    container_attributes: &ContainerAttributes,
 ) -> proc_macro2::TokenStream {
     let field_names: Vec<_> = fields
         .named
@@ -186,6 +530,15 @@ fn generate_named_struct_deserialize(
         .filter_map(|f| f.ident.as_ref())
         .collect();
     let field_types: Vec<_> = fields.named.iter().map(|f| &f.ty).collect();
+    let field_attributes = match fields
+        .named
+        .iter()
+        .map(|field| parse_field_attributes(&field.attrs))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(attrs) => attrs,
+        Err(e) => return e.to_compile_error().into(),
+    };
     let generics = insert_trait_bounds(generics, "Deserialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
@@ -205,12 +558,24 @@ fn generate_named_struct_deserialize(
         };
     }
 
-    let field_names_str: Vec<String> = field_names
-        .iter()
-        .map(|field_name| unescape_identifier(&field_name.to_string()).to_string())
-        .collect();
-    let expected_fields_array = quote::quote! {
-        let expected_fields = [#(#field_names_str),*];
+    let expected_fields_array = {
+        let field_names_str = field_names
+            .iter()
+            .zip(field_attributes.iter())
+            .filter(|(_, field_attributes)| {
+                !field_attributes.skip && !field_attributes.skip_deserializing
+            })
+            .map(|(field_name, field_attributes)| {
+                get_field_name(
+                    &field_name.to_string(),
+                    &field_attributes,
+                    container_attributes,
+                )
+            });
+
+        quote::quote! {
+            let expected_fields = [#(#field_names_str),*];
+        }
     };
     let field_declarations =
         field_names
@@ -221,55 +586,98 @@ fn generate_named_struct_deserialize(
                     let mut #field_name: Option<#field_type> = None;
                 }
             });
-    let field_matching =
-        field_names
-            .iter()
-            .zip(field_types.iter())
-            .map(|(field_name, field_type)| {
-                let field_name_str = unescape_identifier(&field_name.to_string());
+    let field_matching = field_names
+        .iter()
+        .zip(field_types.iter())
+        .zip(field_attributes.iter())
+        .filter(|((_, _), field_attributes)| {
+            !field_attributes.skip && !field_attributes.skip_deserializing
+        })
+        .map(|((field_name, field_type), field_attributes)| {
+            let field_name_str = get_field_name(
+                &field_name.to_string(),
+                &field_attributes,
+                container_attributes,
+            );
 
-                quote::quote! {
-                    if field_name == #field_name_str {
-                        #field_name = Some(<#field_type>::deserialize(field_value)?);
+            let mut conditions = Vec::from([quote::quote! { field_name == #field_name_str }]);
 
-                        continue;
-                    }
+            for alias in &field_attributes.alias {
+                conditions.push(quote::quote! { field_name == #alias });
+            }
+
+            quote::quote! {
+                if #(#conditions)||* {
+                    #field_name = Some(<#field_type>::deserialize(field_value)?);
+
+                    continue;
                 }
-            });
-    let field_assignments = field_names.iter().map(|field_name| {
-        let field_name_str = unescape_identifier(&field_name.to_string());
+            }
+        });
+    let field_assignments = field_names
+        .iter()
+        .zip(field_types.iter())
+        .zip(field_attributes.iter())
+        .map(|((field_name, field_type), field_attributes)| {
+            if field_attributes.skip || field_attributes.skip_deserializing {
+                return quote::quote! {
+                    let #field_name = <#field_type>::default();
+                };
+            }
 
-        quote::quote! {
-            let #field_name = #field_name.ok_or_else(|| {
-                ::celkit::core::Error::new(format!(
-                    "Missing `{}` field in `{}`",
-                    #field_name_str,
-                    stringify!(#name),
-                ))
-            })?;
-        }
-    });
-    let positional_field_assignments =
-        field_names
-            .iter()
-            .zip(field_types.iter())
-            .map(|(field_name, field_type)| {
-                let field_name_str = unescape_identifier(&field_name.to_string());
+            if field_attributes.default {
+                return quote::quote! {
+                    let #field_name = #field_name.unwrap_or_else(|| <#field_type>::default());
+                };
+            }
 
-                quote::quote! {
-                    let #field_name = {
-                        let (_, field_value) = fields_iter
-                            .next()
-                            .ok_or_else(|| ::celkit::core::Error::new(format!(
-                                "Missing field `{}` in positional deserialization of struct `{}`",
-                                #field_name_str,
-                                stringify!(#name),
-                            )))?;
+            let field_name_str = get_field_name(
+                &field_name.to_string(),
+                &field_attributes,
+                container_attributes,
+            );
 
-                        <#field_type>::deserialize(field_value)?
-                    };
-                }
-            });
+            quote::quote! {
+                let #field_name = #field_name.ok_or_else(|| {
+                    ::celkit::core::Error::new(format!(
+                        "Missing `{}` field in `{}`",
+                        #field_name_str,
+                        stringify!(#name),
+                    ))
+                })?;
+            }
+        });
+    let positional_field_assignments = field_names
+        .iter()
+        .zip(field_types.iter())
+        .zip(field_attributes.iter())
+        .map(|((field_name, field_type), field_attributes)| {
+            if field_attributes.skip || field_attributes.skip_deserializing {
+                return quote::quote! {
+                    let #field_name = <#field_type>::default();
+                };
+            }
+
+            let field_name_str = get_field_name(
+                &field_name.to_string(),
+                &field_attributes,
+                container_attributes,
+            );
+
+            quote::quote! {
+                let #field_name = {
+                    let (_, field_value) = fields_iter
+                        .next()
+                        .ok_or_else(|| ::celkit::core::Error::new(format!(
+                            "Missing field `{}` in positional deserialization of struct `{}`",
+                            #field_name_str,
+                            stringify!(#name),
+                        )))?;
+
+                    <#field_type>::deserialize(field_value)?
+                };
+            }
+        });
     let struct_construction = quote::quote! {
         Ok(#name {
             #(#field_names),*
@@ -293,7 +701,7 @@ fn generate_named_struct_deserialize(
                                     break;
                                 }
 
-                                if i >= expected_fields.len() || expected_fields[i] != field_name {
+                                if expected_fields[i] != field_name {
                                     // Order isn't correct
                                     positional = false;
 
@@ -415,11 +823,14 @@ fn generate_struct_deserialize(
     name: &syn::Ident,
     generics: syn::Generics,
     data: &syn::DataStruct,
+    container_attributes: &ContainerAttributes,
 ) -> proc_macro2::TokenStream {
     let fields = &data.fields;
 
     match fields {
-        syn::Fields::Named(fields) => generate_named_struct_deserialize(name, generics, fields),
+        syn::Fields::Named(fields) => {
+            generate_named_struct_deserialize(name, generics, fields, container_attributes)
+        }
         syn::Fields::Unnamed(fields) => generate_unnamed_struct_deserialize(name, generics, fields),
         syn::Fields::Unit => generate_unit_struct_deserialize(name, generics),
     }
@@ -676,7 +1087,7 @@ fn generate_named_enum_deserialize(
                                 break;
                             }
 
-                            if i >= expected_fields.len() || expected_fields[i] != field_name {
+                            if expected_fields[i] != field_name {
                                 // Order isn't correct
                                 positional = false;
 
