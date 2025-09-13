@@ -464,8 +464,8 @@ impl Decoder {
         let mut is_raw_identifier = false;
 
         if self.position + 1 < self.input.len() {
-            is_raw_identifier =
-                self.current_char == Some('r') && self.input[self.position + 1] == '#';
+            is_raw_identifier = (self.current_char == Some('r') || self.current_char == Some('R'))
+                && self.input[self.position + 1] == '#';
         }
 
         if is_raw_identifier {
@@ -474,7 +474,7 @@ impl Decoder {
         }
 
         while let Some(c) = self.current_char {
-            if !c.is_alphanumeric() && c != '_' {
+            if !c.is_alphanumeric() && c != '_' && c != '-' {
                 break;
             }
 
@@ -482,18 +482,18 @@ impl Decoder {
         }
 
         let identifier: String = self.input[start..self.position].iter().collect();
-        let identifier = identifier.to_lowercase();
+        let identifier_lower = identifier.to_lowercase();
 
         if expected_identifier {
             return Ok(Token::Identifier(identifier));
         }
 
-        match identifier.as_str() {
+        match identifier_lower.as_str() {
             "inf" => Ok(Token::Numeric(Number::F64(f64::INFINITY))),
             "nan" => Ok(Token::Numeric(Number::F64(f64::NAN))),
             "true" => Ok(Token::Boolean(true)),
             "false" => Ok(Token::Boolean(false)),
-            _ if identifier == Token::Null.to_string() => Ok(Token::Null),
+            _ if identifier_lower == Token::Null.to_string() => Ok(Token::Null),
             _ => Ok(Token::Identifier(identifier)),
         }
     }
@@ -505,7 +505,9 @@ impl Decoder {
             None => Ok(Token::Eof),
             Some('"') => self.find_literal(),
             Some(c) if c.is_ascii_digit() || c == '+' || c == '-' => self.find_numeric(),
-            Some(c) if c.is_alphabetic() => self.find_identifier_or_keyword(!expected_value),
+            Some(c) if c.is_alphabetic() || c == '_' => {
+                self.find_identifier_or_keyword(!expected_value)
+            }
             Some(c) => self.find_char(c),
         }
     }
@@ -865,8 +867,8 @@ impl Decoder {
     }
 }
 
-pub fn from_str<T: celkit_core::Deserialize>(text: &str) -> celkit_core::internal::Result<T> {
-    let deserialized = Decoder::new(text).decode()?;
+pub fn from_str<T: celkit_core::Deserialize>(input: &str) -> celkit_core::internal::Result<T> {
+    let deserialized = Decoder::new(input).decode()?;
 
     T::deserialize(deserialized)
 }
