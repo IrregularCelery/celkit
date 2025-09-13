@@ -455,8 +455,21 @@ fn generate_unnamed_struct_serialize(
     generics: syn::Generics,
     fields: &syn::FieldsUnnamed,
 ) -> proc_macro2::TokenStream {
-    let field_count = fields.unnamed.len();
-    let fields = fields.unnamed.iter().enumerate().map(|(i, _)| {
+    let serializable_fields: Vec<_> = fields
+        .unnamed
+        .iter()
+        .filter_map(|field| {
+            let field_attributes = parse_field_attributes(&field.attrs).ok()?;
+
+            if field_attributes.skip || field_attributes.skip_serializing {
+                return None;
+            }
+
+            Some((field, field_attributes))
+        })
+        .collect();
+    let field_count = serializable_fields.len();
+    let fields = serializable_fields.iter().enumerate().map(|(i, _)| {
         let index = syn::Index::from(i);
 
         quote::quote! {
@@ -536,7 +549,7 @@ fn generate_named_struct_deserialize(
         .map(|field| parse_field_attributes(&field.attrs))
         .collect::<Result<Vec<_>, _>>()
     {
-        Ok(attrs) => attrs,
+        Ok(attributes) => attributes,
         Err(e) => return e.to_compile_error().into(),
     };
     let generics = insert_trait_bounds(generics, "Deserialize");
@@ -746,23 +759,85 @@ fn generate_unnamed_struct_deserialize(
     generics: syn::Generics,
     fields: &syn::FieldsUnnamed,
 ) -> proc_macro2::TokenStream {
-    let field_count = fields.unnamed.len();
-    let field_types: Vec<_> = fields.unnamed.iter().map(|f| &f.ty).collect();
-    let fields = field_types.iter().enumerate().map(|(i, field_type)| {
-        let field_ident = syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site());
+    let field_attributes = match fields
+        .unnamed
+        .iter()
+        .map(|field| parse_field_attributes(&field.attrs))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(attributes) => attributes,
+        Err(e) => return e.to_compile_error().into(),
+    };
+    let mut errors: Option<syn::Error> = None;
+    let mut has_default_field = false;
 
-        quote::quote! {
-            let #field_ident = <#field_type>::deserialize(
-                fields_iter.next()
-                    .ok_or_else(|| ::celkit::core::Error::new(format!(
-                        "Missing field {} in struct `{}`",
-                        #i,
-                        stringify!(#name),
-                    )))?.1
-            )?;
+    for (i, field_attributes) in field_attributes.iter().enumerate() {
+        if has_default_field
+            && !field_attributes.default
+            && !field_attributes.skip
+            && !field_attributes.skip_deserializing
+        {
+            let error = syn::Error::new_spanned(
+                &fields.unnamed[i],
+                "Field must have `default/skip` attribute because \
+                previous field has `default` attribute",
+            );
+
+            match errors {
+                Some(ref mut errors) => errors.combine(error),
+                None => errors = Some(error),
+            }
         }
-    });
-    let field_idents = (0..field_count)
+
+        if field_attributes.default {
+            has_default_field = true;
+        }
+    }
+
+    if let Some(errors) = errors {
+        return errors.to_compile_error().into();
+    }
+
+    let field_count = field_attributes
+        .iter()
+        .filter(|attributes| !attributes.skip && !attributes.skip_deserializing)
+        .count();
+    let field_types: Vec<_> = fields.unnamed.iter().map(|f| &f.ty).collect();
+    let fields = field_types
+        .iter()
+        .zip(field_attributes.iter())
+        .enumerate()
+        .map(|(i, (field_type, field_attributes))| {
+            let field_ident =
+                syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site());
+
+            if field_attributes.skip || field_attributes.skip_deserializing {
+                return quote::quote! {
+                    let #field_ident = <#field_type>::default();
+                };
+            }
+
+            if field_attributes.default {
+                return quote::quote! {
+                    let #field_ident = match fields_iter.next() {
+                        Some((_, field_value)) => <#field_type>::deserialize(field_value)?,
+                        None => <#field_type>::default(),
+                    };
+                };
+            }
+
+            quote::quote! {
+                let #field_ident = <#field_type>::deserialize(
+                    fields_iter.next()
+                        .ok_or_else(|| ::celkit::core::Error::new(format!(
+                            "Missing field {} in struct `{}`",
+                            #i,
+                            stringify!(#name),
+                        )))?.1
+                )?;
+            }
+        });
+    let field_idents = (0..field_types.len())
         .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()));
     let generics = insert_trait_bounds(generics, "Deserialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
@@ -772,11 +847,11 @@ fn generate_unnamed_struct_deserialize(
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
                     ::celkit::core::Value::Struct(fields) => {
-                        if fields.len() != #field_count {
+                        if fields.len() > #field_count {
                             return Err(::celkit::core::Error::new(format!(
-                                "Expected {} fields for struct `{}`, got {}",
-                                #field_count,
+                                "Too many fields for struct `{}`, expected {}, got {}",
                                 stringify!(#name),
+                                #field_count,
                                 fields.len()
                             )));
                         }
