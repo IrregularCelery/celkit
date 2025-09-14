@@ -193,14 +193,18 @@ pub fn derive_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStre
             generate_struct_serialize(name, generics, data, &container_attributes)
         }
         syn::Data::Enum(data) => generate_enum_serialize(name, generics, data),
-        syn::Data::Union(_) => {
-            return syn::Error::new_spanned(name, "Serialization isn't available for unions")
-                .to_compile_error()
-                .into();
-        }
+        syn::Data::Union(_) => Err(syn::Error::new_spanned(
+            name,
+            "Serialization isn't available for unions",
+        )),
     };
 
-    proc_macro::TokenStream::from(impl_serialize)
+    let tokens = match impl_serialize {
+        Ok(tokens) => tokens,
+        Err(e) => return e.to_compile_error().into(),
+    };
+
+    proc_macro::TokenStream::from(tokens)
 }
 
 #[proc_macro_derive(Deserialize, attributes(celkit))]
@@ -227,7 +231,12 @@ pub fn derive_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         }
     };
 
-    proc_macro::TokenStream::from(impl_deserialize)
+    let tokens = match impl_deserialize {
+        Ok(tokens) => tokens,
+        Err(e) => return e.to_compile_error().into(),
+    };
+
+    proc_macro::TokenStream::from(tokens)
 }
 
 fn insert_trait_bounds(mut generics: syn::Generics, trait_name: &str) -> syn::Generics {
@@ -398,19 +407,14 @@ fn generate_named_struct_serialize(
     generics: syn::Generics,
     fields: &syn::FieldsNamed,
     container_attributes: &ContainerAttributes,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let serializable_fields: Vec<_> = fields
         .named
         .iter()
-        .filter_map(|field| {
-            let field_attributes = parse_field_attributes(&field.attrs).ok()?;
-
-            if field_attributes.skip || field_attributes.skip_serializing {
-                return None;
-            }
-
-            Some((field, field_attributes))
-        })
+        .map(|field| parse_field_attributes(&field.attrs).map(|attributes| (field, attributes)))
+        .collect::<syn::Result<Vec<_>>>()?
+        .into_iter()
+        .filter(|(_, attributes)| !attributes.skip && !attributes.skip_serializing)
         .collect();
     let field_count = serializable_fields.len();
     let fields = serializable_fields.iter().map(|(field, field_attributes)| {
@@ -435,7 +439,7 @@ fn generate_named_struct_serialize(
     let generics = insert_trait_bounds(generics, "Serialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
-    quote::quote! {
+    Ok(quote::quote! {
         impl #impl_generics ::celkit::Serialize for #name #type_generics #where_clause {
             fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
                 use ::celkit::core::*;
@@ -447,30 +451,28 @@ fn generate_named_struct_serialize(
                 Ok(::celkit::core::Value::Struct(fields))
             }
         }
-    }
+    })
 }
 
 fn generate_unnamed_struct_serialize(
     name: &syn::Ident,
     generics: syn::Generics,
     fields: &syn::FieldsUnnamed,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let serializable_fields: Vec<_> = fields
         .unnamed
         .iter()
-        .filter_map(|field| {
-            let field_attributes = parse_field_attributes(&field.attrs).ok()?;
-
-            if field_attributes.skip || field_attributes.skip_serializing {
-                return None;
-            }
-
-            Some((field, field_attributes))
+        .enumerate()
+        .map(|(i, field)| {
+            parse_field_attributes(&field.attrs).map(|attributes| (i, field, attributes))
         })
+        .collect::<syn::Result<Vec<_>>>()?
+        .into_iter()
+        .filter(|(_, _, attributes)| !attributes.skip && !attributes.skip_serializing)
         .collect();
     let field_count = serializable_fields.len();
-    let fields = serializable_fields.iter().enumerate().map(|(i, _)| {
-        let index = syn::Index::from(i);
+    let fields = serializable_fields.iter().map(|(i, _, _)| {
+        let index = syn::Index::from(*i);
 
         quote::quote! {
             fields.push((String::new(), self.#index.serialize()?));
@@ -479,7 +481,7 @@ fn generate_unnamed_struct_serialize(
     let generics = insert_trait_bounds(generics, "Serialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
-    quote::quote! {
+    Ok(quote::quote! {
         impl #impl_generics ::celkit::Serialize for #name #type_generics #where_clause {
             fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
                 use ::celkit::core::*;
@@ -491,17 +493,17 @@ fn generate_unnamed_struct_serialize(
                 Ok(::celkit::core::Value::Struct(fields))
             }
         }
-    }
+    })
 }
 
 fn generate_unit_struct_serialize(
     name: &syn::Ident,
     generics: syn::Generics,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let generics = insert_trait_bounds(generics, "Serialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
-    quote::quote! {
+    Ok(quote::quote! {
         impl #impl_generics ::celkit::Serialize for #name #type_generics #where_clause {
             fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
                 use ::celkit::core::*;
@@ -509,7 +511,7 @@ fn generate_unit_struct_serialize(
                 Ok(::celkit::core::Value::Struct(Vec::new()))
             }
         }
-    }
+    })
 }
 
 fn generate_struct_serialize(
@@ -517,7 +519,7 @@ fn generate_struct_serialize(
     generics: syn::Generics,
     data: &syn::DataStruct,
     container_attributes: &ContainerAttributes,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let fields = &data.fields;
 
     match fields {
@@ -536,27 +538,23 @@ fn generate_named_struct_deserialize(
     generics: syn::Generics,
     fields: &syn::FieldsNamed,
     container_attributes: &ContainerAttributes,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let field_names: Vec<_> = fields
         .named
         .iter()
         .filter_map(|f| f.ident.as_ref())
         .collect();
     let field_types: Vec<_> = fields.named.iter().map(|f| &f.ty).collect();
-    let field_attributes = match fields
+    let field_attributes = fields
         .named
         .iter()
         .map(|field| parse_field_attributes(&field.attrs))
-        .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(attributes) => attributes,
-        Err(e) => return e.to_compile_error().into(),
-    };
+        .collect::<syn::Result<Vec<_>>>()?;
     let generics = insert_trait_bounds(generics, "Deserialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     if field_names.is_empty() {
-        return quote::quote! {
+        return Ok(quote::quote! {
             impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
                 fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                     match value {
@@ -568,7 +566,7 @@ fn generate_named_struct_deserialize(
                     }
                 }
             }
-        };
+        });
     }
 
     let expected_fields_array = {
@@ -697,7 +695,7 @@ fn generate_named_struct_deserialize(
         })
     };
 
-    quote::quote! {
+    Ok(quote::quote! {
         impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
@@ -751,23 +749,19 @@ fn generate_named_struct_deserialize(
                 }
             }
         }
-    }
+    })
 }
 
 fn generate_unnamed_struct_deserialize(
     name: &syn::Ident,
     generics: syn::Generics,
     fields: &syn::FieldsUnnamed,
-) -> proc_macro2::TokenStream {
-    let field_attributes = match fields
+) -> syn::Result<proc_macro2::TokenStream> {
+    let field_attributes = fields
         .unnamed
         .iter()
         .map(|field| parse_field_attributes(&field.attrs))
-        .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(attributes) => attributes,
-        Err(e) => return e.to_compile_error().into(),
-    };
+        .collect::<syn::Result<Vec<_>>>()?;
     let mut errors: Option<syn::Error> = None;
     let mut has_default_field = false;
 
@@ -795,7 +789,7 @@ fn generate_unnamed_struct_deserialize(
     }
 
     if let Some(errors) = errors {
-        return errors.to_compile_error().into();
+        return Err(errors);
     }
 
     let field_count = field_attributes
@@ -842,7 +836,7 @@ fn generate_unnamed_struct_deserialize(
     let generics = insert_trait_bounds(generics, "Deserialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
-    quote::quote! {
+    Ok(quote::quote! {
         impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
@@ -869,17 +863,17 @@ fn generate_unnamed_struct_deserialize(
                 }
             }
         }
-    }
+    })
 }
 
 fn generate_unit_struct_deserialize(
     name: &syn::Ident,
     generics: syn::Generics,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let generics = insert_trait_bounds(generics, "Deserialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
-    quote::quote! {
+    Ok(quote::quote! {
         impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
@@ -891,7 +885,7 @@ fn generate_unit_struct_deserialize(
                 }
             }
         }
-    }
+    })
 }
 
 fn generate_struct_deserialize(
@@ -899,7 +893,7 @@ fn generate_struct_deserialize(
     generics: syn::Generics,
     data: &syn::DataStruct,
     container_attributes: &ContainerAttributes,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let fields = &data.fields;
 
     match fields {
@@ -917,7 +911,7 @@ fn generate_named_enum_serialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
     fields: &syn::FieldsNamed,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let field_count = fields.named.len();
     let field_names: Vec<_> = fields
         .named
@@ -935,7 +929,7 @@ fn generate_named_enum_serialize(
         }
     });
 
-    quote::quote! {
+    Ok(quote::quote! {
         #name::#variant_name { #(#field_names),* } => {
             use ::celkit::core::*;
 
@@ -950,14 +944,14 @@ fn generate_named_enum_serialize(
 
             Ok(::celkit::core::Value::Object(variant_object))
         }
-    }
+    })
 }
 
 fn generate_unnamed_enum_serialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
     fields: &syn::FieldsUnnamed,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let field_count = fields.unnamed.len();
     let field_names: Vec<_> = (0..field_count)
         .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()))
@@ -968,7 +962,7 @@ fn generate_unnamed_enum_serialize(
         }
     });
 
-    quote::quote! {
+    Ok(quote::quote! {
         #name::#variant_name(#(#field_names),*) => {
             use ::celkit::core::*;
 
@@ -983,14 +977,14 @@ fn generate_unnamed_enum_serialize(
 
             Ok(::celkit::core::Value::Object(variant_object))
         }
-    }
+    })
 }
 
 fn generate_unit_enum_serialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
-) -> proc_macro2::TokenStream {
-    quote::quote! {
+) -> syn::Result<proc_macro2::TokenStream> {
+    Ok(quote::quote! {
         #name::#variant_name => {
             use ::celkit::core::*;
 
@@ -1000,41 +994,47 @@ fn generate_unit_enum_serialize(
 
             Ok(::celkit::core::Value::Object(variant_object))
         }
-    }
+    })
 }
 
 fn generate_enum_serialize(
     name: &syn::Ident,
     generics: syn::Generics,
     data: &syn::DataEnum,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let generics = insert_trait_bounds(generics, "Serialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     if data.variants.is_empty() {
-        return quote::quote! {
+        return Ok(quote::quote! {
             impl #impl_generics ::celkit::Serialize for #name #type_generics #where_clause {
                 fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
                     // This is unreachable because you cannot construct a value of empty enum
                     match *self {}
                 }
             }
-        };
+        });
     }
 
-    let variants = data.variants.iter().map(|variant| {
-        let variant_name = &variant.ident;
+    let variants = data
+        .variants
+        .iter()
+        .map(|variant| {
+            let variant_name = &variant.ident;
 
-        match &variant.fields {
-            syn::Fields::Named(fields) => generate_named_enum_serialize(name, variant_name, fields),
-            syn::Fields::Unnamed(fields) => {
-                generate_unnamed_enum_serialize(name, variant_name, fields)
+            match &variant.fields {
+                syn::Fields::Named(fields) => {
+                    generate_named_enum_serialize(name, variant_name, fields)
+                }
+                syn::Fields::Unnamed(fields) => {
+                    generate_unnamed_enum_serialize(name, variant_name, fields)
+                }
+                syn::Fields::Unit => generate_unit_enum_serialize(name, variant_name),
             }
-            syn::Fields::Unit => generate_unit_enum_serialize(name, variant_name),
-        }
-    });
+        })
+        .collect::<syn::Result<Vec<_>>>()?;
 
-    quote::quote! {
+    Ok(quote::quote! {
         impl #impl_generics ::celkit::Serialize for #name #type_generics #where_clause {
             fn serialize(&self) -> ::celkit::core::Result<::celkit::core::Value> {
                 match self {
@@ -1042,7 +1042,7 @@ fn generate_enum_serialize(
                 }
             }
         }
-    }
+    })
 }
 
 // ------------------------ Enum Deserialization -------------------------- //
@@ -1051,7 +1051,7 @@ fn generate_named_enum_deserialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
     fields: &syn::FieldsNamed,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let field_names: Vec<_> = fields
         .named
         .iter()
@@ -1060,7 +1060,7 @@ fn generate_named_enum_deserialize(
     let field_types: Vec<_> = fields.named.iter().map(|f| &f.ty).collect();
 
     if field_names.is_empty() {
-        return quote::quote! {
+        return Ok(quote::quote! {
             stringify!(#variant_name) => {
                 match variant_value {
                     ::celkit::core::Value::Struct(fields) if fields.is_empty() => {
@@ -1072,7 +1072,7 @@ fn generate_named_enum_deserialize(
                     )))
                 }
             }
-        };
+        });
     }
 
     let field_names_str: Vec<String> = field_names
@@ -1146,7 +1146,7 @@ fn generate_named_enum_deserialize(
         })
     };
 
-    quote::quote! {
+    Ok(quote::quote! {
         stringify!(#variant_name) => {
             match variant_value {
                 ::celkit::core::Value::Struct(fields) => {
@@ -1198,14 +1198,14 @@ fn generate_named_enum_deserialize(
                 )))
             }
         }
-    }
+    })
 }
 
 fn generate_unnamed_enum_deserialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
     fields: &syn::FieldsUnnamed,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let field_count = fields.unnamed.len();
     let field_types: Vec<_> = fields.unnamed.iter().map(|f| &f.ty).collect();
     let fields = field_types.iter().enumerate().map(|(i, field_type)| {
@@ -1225,7 +1225,7 @@ fn generate_unnamed_enum_deserialize(
     let field_idents = (0..field_count)
         .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()));
 
-    quote::quote! {
+    Ok(quote::quote! {
         stringify!(#variant_name) => {
             match variant_value {
                 ::celkit::core::Value::Tuple(fields) => {
@@ -1241,14 +1241,14 @@ fn generate_unnamed_enum_deserialize(
                 )))
             }
         }
-    }
+    })
 }
 
 fn generate_unit_enum_deserialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
-) -> proc_macro2::TokenStream {
-    quote::quote! {
+) -> syn::Result<proc_macro2::TokenStream> {
+    Ok(quote::quote! {
         stringify!(#variant_name) => {
             match variant_value {
                 ::celkit::core::Value::Null => Ok(#name::#variant_name),
@@ -1258,19 +1258,19 @@ fn generate_unit_enum_deserialize(
                 )))
             }
         }
-    }
+    })
 }
 
 fn generate_enum_deserialize(
     name: &syn::Ident,
     generics: syn::Generics,
     data: &syn::DataEnum,
-) -> proc_macro2::TokenStream {
+) -> syn::Result<proc_macro2::TokenStream> {
     let generics = insert_trait_bounds(generics, "Deserialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     if data.variants.is_empty() {
-        return quote::quote! {
+        return Ok(quote::quote! {
             impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
                 fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                     Err(::celkit::core::Error::new(format!(
@@ -1279,24 +1279,28 @@ fn generate_enum_deserialize(
                     )))
                 }
             }
-        };
+        });
     }
 
-    let variants = data.variants.iter().map(|variant| {
-        let variant_name = &variant.ident;
+    let variants = data
+        .variants
+        .iter()
+        .map(|variant| {
+            let variant_name = &variant.ident;
 
-        match &variant.fields {
-            syn::Fields::Named(fields) => {
-                generate_named_enum_deserialize(name, variant_name, fields)
+            match &variant.fields {
+                syn::Fields::Named(fields) => {
+                    generate_named_enum_deserialize(name, variant_name, fields)
+                }
+                syn::Fields::Unnamed(fields) => {
+                    generate_unnamed_enum_deserialize(name, variant_name, fields)
+                }
+                syn::Fields::Unit => generate_unit_enum_deserialize(name, variant_name),
             }
-            syn::Fields::Unnamed(fields) => {
-                generate_unnamed_enum_deserialize(name, variant_name, fields)
-            }
-            syn::Fields::Unit => generate_unit_enum_deserialize(name, variant_name),
-        }
-    });
+        })
+        .collect::<syn::Result<Vec<_>>>()?;
 
-    quote::quote! {
+    Ok(quote::quote! {
         impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
@@ -1330,5 +1334,5 @@ fn generate_enum_deserialize(
                 }
             }
         }
-    }
+    })
 }
