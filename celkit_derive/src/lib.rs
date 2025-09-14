@@ -419,7 +419,7 @@ fn generate_named_struct_serialize(
     let field_count = serializable_fields.len();
     let fields = serializable_fields.iter().map(|(field, field_attributes)| {
         let Some(field_name) = &field.ident else {
-            return syn::Error::new_spanned(field, "Named field must have an `identifier`")
+            return syn::Error::new_spanned(field, "Named fields must have an `identifier`")
                 .to_compile_error();
         };
 
@@ -911,15 +911,33 @@ fn generate_named_enum_serialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
     fields: &syn::FieldsNamed,
+    container_attributes: &ContainerAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
-    let field_count = fields.named.len();
     let field_names: Vec<_> = fields
         .named
         .iter()
         .filter_map(|f| f.ident.as_ref())
         .collect();
-    let fields = field_names.iter().map(|field_name| {
-        let field_name_str = unescape_identifier(&field_name.to_string());
+    let serializable_fields: Vec<_> = fields
+        .named
+        .iter()
+        .map(|field| parse_field_attributes(&field.attrs).map(|attributes| (field, attributes)))
+        .collect::<syn::Result<Vec<_>>>()?
+        .into_iter()
+        .filter(|(_, attributes)| !attributes.skip && !attributes.skip_serializing)
+        .collect();
+    let field_count = serializable_fields.len();
+    let fields = serializable_fields.iter().map(|(field, field_attributes)| {
+        let Some(field_name) = &field.ident else {
+            return syn::Error::new_spanned(field, "Named fields must have an `identifier`")
+                .to_compile_error();
+        };
+
+        let field_name_str = get_field_name(
+            &field_name.to_string(),
+            field_attributes,
+            container_attributes,
+        );
 
         quote::quote! {
             fields.push((
@@ -1021,10 +1039,13 @@ fn generate_enum_serialize(
         .iter()
         .map(|variant| {
             let variant_name = &variant.ident;
+            let attributes = &variant.attrs;
+            // TODO: Should be parsed as variant_attributes
+            let container_attributes = parse_container_attributes(attributes)?;
 
             match &variant.fields {
                 syn::Fields::Named(fields) => {
-                    generate_named_enum_serialize(name, variant_name, fields)
+                    generate_named_enum_serialize(name, variant_name, fields, &container_attributes)
                 }
                 syn::Fields::Unnamed(fields) => {
                     generate_unnamed_enum_serialize(name, variant_name, fields)
@@ -1051,6 +1072,7 @@ fn generate_named_enum_deserialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
     fields: &syn::FieldsNamed,
+    container_attributes: &ContainerAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
     let field_names: Vec<_> = fields
         .named
@@ -1058,6 +1080,11 @@ fn generate_named_enum_deserialize(
         .filter_map(|f| f.ident.as_ref())
         .collect();
     let field_types: Vec<_> = fields.named.iter().map(|f| &f.ty).collect();
+    let field_attributes = fields
+        .named
+        .iter()
+        .map(|field| parse_field_attributes(&field.attrs))
+        .collect::<syn::Result<Vec<_>>>()?;
 
     if field_names.is_empty() {
         return Ok(quote::quote! {
@@ -1075,12 +1102,24 @@ fn generate_named_enum_deserialize(
         });
     }
 
-    let field_names_str: Vec<String> = field_names
-        .iter()
-        .map(|field_name| unescape_identifier(&field_name.to_string()).to_string())
-        .collect();
-    let expected_fields_array = quote::quote! {
-        let expected_fields = [#(#field_names_str),*];
+    let expected_fields_array = {
+        let field_names_str = field_names
+            .iter()
+            .zip(field_attributes.iter())
+            .filter(|(_, field_attributes)| {
+                !field_attributes.skip && !field_attributes.skip_deserializing
+            })
+            .map(|(field_name, field_attributes)| {
+                get_field_name(
+                    &field_name.to_string(),
+                    &field_attributes,
+                    container_attributes,
+                )
+            });
+
+        quote::quote! {
+            let expected_fields = [#(#field_names_str),*];
+        }
     };
     let field_declarations =
         field_names
@@ -1091,55 +1130,98 @@ fn generate_named_enum_deserialize(
                     let mut #field_name: Option<#field_type> = None;
                 }
             });
-    let field_matching =
-        field_names
-            .iter()
-            .zip(field_types.iter())
-            .map(|(field_name, field_type)| {
-                let field_name_str = unescape_identifier(&field_name.to_string());
+    let field_matching = field_names
+        .iter()
+        .zip(field_types.iter())
+        .zip(field_attributes.iter())
+        .filter(|((_, _), field_attributes)| {
+            !field_attributes.skip && !field_attributes.skip_deserializing
+        })
+        .map(|((field_name, field_type), field_attributes)| {
+            let field_name_str = get_field_name(
+                &field_name.to_string(),
+                &field_attributes,
+                container_attributes,
+            );
 
-                quote::quote! {
-                    if field_name == #field_name_str {
-                        #field_name = Some(<#field_type>::deserialize(field_value)?);
+            let mut conditions = Vec::from([quote::quote! { field_name == #field_name_str }]);
 
-                        continue;
-                    }
+            for alias in &field_attributes.alias {
+                conditions.push(quote::quote! { field_name == #alias });
+            }
+
+            quote::quote! {
+                if #(#conditions)||* {
+                    #field_name = Some(<#field_type>::deserialize(field_value)?);
+
+                    continue;
                 }
-            });
-    let field_assignments = field_names.iter().map(|field_name| {
-        let field_name_str = unescape_identifier(&field_name.to_string());
+            }
+        });
+    let field_assignments = field_names
+        .iter()
+        .zip(field_types.iter())
+        .zip(field_attributes.iter())
+        .map(|((field_name, field_type), field_attributes)| {
+            if field_attributes.skip || field_attributes.skip_deserializing {
+                return quote::quote! {
+                    let #field_name = <#field_type>::default();
+                };
+            }
 
-        quote::quote! {
-            let #field_name = #field_name.ok_or_else(|| {
-                ::celkit::core::Error::new(format!(
-                    "Missing field `{}` in variant `{}`",
-                    #field_name_str,
-                    stringify!(#variant_name),
-                ))
-            })?;
-        }
-    });
-    let positional_field_assignments =
-        field_names
-            .iter()
-            .zip(field_types.iter())
-            .map(|(field_name, field_type)| {
-                let field_name_str = unescape_identifier(&field_name.to_string());
+            if field_attributes.default {
+                return quote::quote! {
+                    let #field_name = #field_name.unwrap_or_else(|| <#field_type>::default());
+                };
+            }
 
-                quote::quote! {
-                    let #field_name = {
-                        let (_, field_value) = fields_iter
-                            .next()
-                            .ok_or_else(|| ::celkit::core::Error::new(format!(
-                                "Missing field `{}` in positional deserialization of variant `{}`",
-                                #field_name_str,
-                                stringify!(#variant_name),
-                            )))?;
+            let field_name_str = get_field_name(
+                &field_name.to_string(),
+                &field_attributes,
+                container_attributes,
+            );
 
-                        <#field_type>::deserialize(field_value)?
-                    };
-                }
-            });
+            quote::quote! {
+                let #field_name = #field_name.ok_or_else(|| {
+                    ::celkit::core::Error::new(format!(
+                        "Missing field `{}` in variant `{}`",
+                        #field_name_str,
+                        stringify!(#variant_name),
+                    ))
+                })?;
+            }
+        });
+    let positional_field_assignments = field_names
+        .iter()
+        .zip(field_types.iter())
+        .zip(field_attributes.iter())
+        .map(|((field_name, field_type), field_attributes)| {
+            if field_attributes.skip || field_attributes.skip_deserializing {
+                return quote::quote! {
+                    let #field_name = <#field_type>::default();
+                };
+            }
+
+            let field_name_str = get_field_name(
+                &field_name.to_string(),
+                &field_attributes,
+                container_attributes,
+            );
+
+            quote::quote! {
+                let #field_name = {
+                    let (_, field_value) = fields_iter
+                        .next()
+                        .ok_or_else(|| ::celkit::core::Error::new(format!(
+                            "Missing field `{}` in positional deserialization of variant `{}`",
+                            #field_name_str,
+                            stringify!(#variant_name),
+                        )))?;
+
+                    <#field_type>::deserialize(field_value)?
+                };
+            }
+        });
     let variant_construction = quote::quote! {
         Ok(#name::#variant_name {
             #(#field_names),*
@@ -1287,11 +1369,17 @@ fn generate_enum_deserialize(
         .iter()
         .map(|variant| {
             let variant_name = &variant.ident;
+            let attributes = &variant.attrs;
+            // TODO: Should be parsed as variant_attributes
+            let container_attributes = parse_container_attributes(attributes)?;
 
             match &variant.fields {
-                syn::Fields::Named(fields) => {
-                    generate_named_enum_deserialize(name, variant_name, fields)
-                }
+                syn::Fields::Named(fields) => generate_named_enum_deserialize(
+                    name,
+                    variant_name,
+                    fields,
+                    &container_attributes,
+                ),
                 syn::Fields::Unnamed(fields) => {
                     generate_unnamed_enum_deserialize(name, variant_name, fields)
                 }
