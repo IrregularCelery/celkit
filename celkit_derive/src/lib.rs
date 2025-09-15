@@ -176,6 +176,17 @@ struct FieldAttributes {
     skip_deserializing: bool,
 }
 
+#[derive(Default)]
+struct VariantAttributes {
+    // Each variant itself is a container for its fields
+    container: ContainerAttributes,
+    rename: Option<String>,
+    alias: Vec<String>,
+    skip: bool,
+    skip_serializing: bool,
+    skip_deserializing: bool,
+}
+
 #[proc_macro_derive(Serialize, attributes(celkit))]
 pub fn derive_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
@@ -192,7 +203,9 @@ pub fn derive_serialize(input: proc_macro::TokenStream) -> proc_macro::TokenStre
         syn::Data::Struct(data) => {
             generate_struct_serialize(name, generics, data, &container_attributes)
         }
-        syn::Data::Enum(data) => generate_enum_serialize(name, generics, data),
+        syn::Data::Enum(data) => {
+            generate_enum_serialize(name, generics, data, &container_attributes)
+        }
         syn::Data::Union(_) => Err(syn::Error::new_spanned(
             name,
             "Serialization isn't available for unions",
@@ -223,7 +236,9 @@ pub fn derive_deserialize(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         syn::Data::Struct(data) => {
             generate_struct_deserialize(name, generics, data, &container_attributes)
         }
-        syn::Data::Enum(data) => generate_enum_deserialize(name, generics, data),
+        syn::Data::Enum(data) => {
+            generate_enum_deserialize(name, generics, data, &container_attributes)
+        }
         syn::Data::Union(_) => {
             return syn::Error::new_spanned(name, "Serialization isn't available for unions")
                 .to_compile_error()
@@ -382,6 +397,82 @@ fn parse_field_attributes(attributes: &[syn::Attribute]) -> syn::Result<FieldAtt
     Ok(field_attributes)
 }
 
+fn parse_variant_attributes(attributes: &[syn::Attribute]) -> syn::Result<VariantAttributes> {
+    let mut variant_attributes = VariantAttributes::default();
+
+    for attribute in attributes {
+        if !attribute.path().is_ident("celkit") {
+            continue;
+        }
+
+        attribute.parse_nested_meta(|meta| {
+            if let Some(path) = meta.path.get_ident() {
+                return match path.to_string().as_str() {
+                    "rename_all" => {
+                        let value = meta.value()?;
+                        let s: syn::LitStr = value.parse()?;
+                        let case_style = CaseStyle::from_str(&s.value());
+
+                        if case_style.is_none() {
+                            return Err(meta.error(format!(
+                                "Unknown case style, Available styles: {}",
+                                CaseStyle::get_styles().join(", ")
+                            )));
+                        }
+
+                        variant_attributes.container.rename_all = case_style;
+
+                        Ok(())
+                    }
+                    "rename" => {
+                        let value = meta.value()?;
+                        let s: syn::LitStr = value.parse()?;
+
+                        variant_attributes.rename = Some(s.value());
+
+                        Ok(())
+                    }
+                    "alias" => {
+                        let value = meta.value()?;
+                        let s: syn::LitStr = value.parse()?;
+
+                        variant_attributes.alias.push(s.value());
+
+                        Ok(())
+                    }
+                    "skip" => {
+                        variant_attributes.skip = true;
+
+                        Ok(())
+                    }
+                    "skip_serializing" => {
+                        variant_attributes.skip_serializing = true;
+
+                        Ok(())
+                    }
+                    "skip_deserializing" => {
+                        variant_attributes.skip_deserializing = true;
+
+                        Ok(())
+                    }
+                    unknown => {
+                        Err(meta.error(format!("Unknown `celkit` variant attribute `{}`", unknown)))
+                    }
+                };
+            }
+
+            Err(meta.error(format!(
+                "Unknown `celkit` variant attribute `{}`",
+                quote::ToTokens::to_token_stream(&meta.path)
+                    .to_string()
+                    .replace(' ', "")
+            )))
+        })?;
+    }
+
+    Ok(variant_attributes)
+}
+
 fn get_field_name(
     field_name: &str,
     field_attributes: &FieldAttributes,
@@ -398,6 +489,22 @@ fn get_field_name(
     }
 
     unescaped
+}
+
+fn get_variant_name(
+    variant_name: &str,
+    variant_attributes: &VariantAttributes,
+    container_attributes: &ContainerAttributes,
+) -> String {
+    if let Some(ref rename) = variant_attributes.rename {
+        return rename.clone();
+    }
+
+    if let Some(ref rename_all) = container_attributes.rename_all {
+        return rename_all.convert(variant_name);
+    }
+
+    variant_name.to_string()
 }
 
 // ------------------------ Struct Serialization -------------------------- //
@@ -912,7 +1019,20 @@ fn generate_named_enum_serialize(
     variant_name: &syn::Ident,
     fields: &syn::FieldsNamed,
     container_attributes: &ContainerAttributes,
+    variant_attributes: &VariantAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    if variant_attributes.skip || variant_attributes.skip_serializing {
+        return Ok(quote::quote! {
+            #name::#variant_name { .. } => {
+                return Err(::celkit::core::Error::new(format!(
+                    "Enum variant `{}::{}` cannot be serialized",
+                    stringify!(#name),
+                    stringify!(#variant_name),
+                )));
+            }
+        });
+    }
+
     let field_names: Vec<_> = fields
         .named
         .iter()
@@ -936,7 +1056,7 @@ fn generate_named_enum_serialize(
         let field_name_str = get_field_name(
             &field_name.to_string(),
             field_attributes,
-            container_attributes,
+            &variant_attributes.container,
         );
 
         quote::quote! {
@@ -946,6 +1066,11 @@ fn generate_named_enum_serialize(
             ));
         }
     });
+    let variant_name_str = get_variant_name(
+        &variant_name.to_string(),
+        &variant_attributes,
+        container_attributes,
+    );
 
     Ok(quote::quote! {
         #name::#variant_name { #(#field_names),* } => {
@@ -958,7 +1083,7 @@ fn generate_named_enum_serialize(
             let variant_value = ::celkit::core::Value::Struct(fields);
             let mut variant_object = BTreeMap::new();
 
-            variant_object.insert(stringify!(#variant_name).to_string(), variant_value);
+            variant_object.insert(#variant_name_str.to_string(), variant_value);
 
             Ok(::celkit::core::Value::Object(variant_object))
         }
@@ -969,7 +1094,21 @@ fn generate_unnamed_enum_serialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
     fields: &syn::FieldsUnnamed,
+    container_attributes: &ContainerAttributes,
+    variant_attributes: &VariantAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    if variant_attributes.skip || variant_attributes.skip_serializing {
+        return Ok(quote::quote! {
+            #name::#variant_name { .. } => {
+                return Err(::celkit::core::Error::new(format!(
+                    "Enum variant `{}::{}` cannot be serialized",
+                    stringify!(#name),
+                    stringify!(#variant_name),
+                )));
+            }
+        });
+    }
+
     let field_names: Vec<_> = (0..fields.unnamed.len())
         .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()))
         .collect();
@@ -992,6 +1131,11 @@ fn generate_unnamed_enum_serialize(
             fields.push(#field_name.serialize()?);
         }
     });
+    let variant_name_str = get_variant_name(
+        &variant_name.to_string(),
+        &variant_attributes,
+        container_attributes,
+    );
 
     Ok(quote::quote! {
         #name::#variant_name(#(#field_names),*) => {
@@ -1004,7 +1148,7 @@ fn generate_unnamed_enum_serialize(
             let variant_value = ::celkit::core::Value::Tuple(fields);
             let mut variant_object = BTreeMap::new();
 
-            variant_object.insert(stringify!(#variant_name).to_string(), variant_value);
+            variant_object.insert(#variant_name_str.to_string(), variant_value);
 
             Ok(::celkit::core::Value::Object(variant_object))
         }
@@ -1014,14 +1158,34 @@ fn generate_unnamed_enum_serialize(
 fn generate_unit_enum_serialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
+    container_attributes: &ContainerAttributes,
+    variant_attributes: &VariantAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    if variant_attributes.skip || variant_attributes.skip_serializing {
+        return Ok(quote::quote! {
+            #name::#variant_name { .. } => {
+                return Err(::celkit::core::Error::new(format!(
+                    "Enum variant `{}::{}` cannot be serialized",
+                    stringify!(#name),
+                    stringify!(#variant_name),
+                )));
+            }
+        });
+    }
+
+    let variant_name_str = get_variant_name(
+        &variant_name.to_string(),
+        &variant_attributes,
+        container_attributes,
+    );
+
     Ok(quote::quote! {
         #name::#variant_name => {
             use ::celkit::core::*;
 
             let mut variant_object = BTreeMap::new();
 
-            variant_object.insert(stringify!(#variant_name).to_string(), ::celkit::core::Value::Null);
+            variant_object.insert(#variant_name_str.to_string(), ::celkit::core::Value::Null);
 
             Ok(::celkit::core::Value::Object(variant_object))
         }
@@ -1032,6 +1196,7 @@ fn generate_enum_serialize(
     name: &syn::Ident,
     generics: syn::Generics,
     data: &syn::DataEnum,
+    container_attributes: &ContainerAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
     let generics = insert_trait_bounds(generics, "Serialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
@@ -1053,17 +1218,29 @@ fn generate_enum_serialize(
         .map(|variant| {
             let variant_name = &variant.ident;
             let attributes = &variant.attrs;
-            // TODO: Should be parsed as variant_attributes
-            let container_attributes = parse_container_attributes(attributes)?;
+            let variant_attributes = parse_variant_attributes(attributes)?;
 
             match &variant.fields {
-                syn::Fields::Named(fields) => {
-                    generate_named_enum_serialize(name, variant_name, fields, &container_attributes)
-                }
-                syn::Fields::Unnamed(fields) => {
-                    generate_unnamed_enum_serialize(name, variant_name, fields)
-                }
-                syn::Fields::Unit => generate_unit_enum_serialize(name, variant_name),
+                syn::Fields::Named(fields) => generate_named_enum_serialize(
+                    name,
+                    variant_name,
+                    fields,
+                    &container_attributes,
+                    &variant_attributes,
+                ),
+                syn::Fields::Unnamed(fields) => generate_unnamed_enum_serialize(
+                    name,
+                    variant_name,
+                    fields,
+                    &container_attributes,
+                    &variant_attributes,
+                ),
+                syn::Fields::Unit => generate_unit_enum_serialize(
+                    name,
+                    variant_name,
+                    &container_attributes,
+                    &variant_attributes,
+                ),
             }
         })
         .collect::<syn::Result<Vec<_>>>()?;
@@ -1086,7 +1263,31 @@ fn generate_named_enum_deserialize(
     variant_name: &syn::Ident,
     fields: &syn::FieldsNamed,
     container_attributes: &ContainerAttributes,
+    variant_attributes: &VariantAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    let variant_name_str = get_variant_name(
+        &variant_name.to_string(),
+        &variant_attributes,
+        container_attributes,
+    );
+    let mut variant_names = Vec::from([quote::quote! { #variant_name_str }]);
+
+    for alias in &variant_attributes.alias {
+        variant_names.push(quote::quote! { #alias });
+    }
+
+    if variant_attributes.skip || variant_attributes.skip_deserializing {
+        return Ok(quote::quote! {
+            #(#variant_names)|* => {
+                return Err(::celkit::core::Error::new(format!(
+                    "Enum variant `{}::{}` cannot be deserialized",
+                    stringify!(#name),
+                    stringify!(#variant_name),
+                )));
+            }
+        });
+    }
+
     let field_names: Vec<_> = fields
         .named
         .iter()
@@ -1101,14 +1302,14 @@ fn generate_named_enum_deserialize(
 
     if field_names.is_empty() {
         return Ok(quote::quote! {
-            stringify!(#variant_name) => {
+            #(#variant_names)|* => {
                 match variant_value {
                     ::celkit::core::Value::Struct(fields) if fields.is_empty() => {
                         Ok(#name::#variant_name {})
                     }
                     _ => Err(::celkit::core::Error::new(format!(
                         "Expected `empty` struct for enum variant `{}`",
-                        stringify!(#variant_name)
+                        #variant_name_str,
                     )))
                 }
             }
@@ -1126,7 +1327,7 @@ fn generate_named_enum_deserialize(
                 get_field_name(
                     &field_name.to_string(),
                     &field_attributes,
-                    container_attributes,
+                    &variant_attributes.container,
                 )
             });
 
@@ -1154,7 +1355,7 @@ fn generate_named_enum_deserialize(
             let field_name_str = get_field_name(
                 &field_name.to_string(),
                 &field_attributes,
-                container_attributes,
+                &variant_attributes.container,
             );
 
             let mut conditions = Vec::from([quote::quote! { field_name == #field_name_str }]);
@@ -1191,7 +1392,7 @@ fn generate_named_enum_deserialize(
             let field_name_str = get_field_name(
                 &field_name.to_string(),
                 &field_attributes,
-                container_attributes,
+                &variant_attributes.container,
             );
 
             quote::quote! {
@@ -1199,7 +1400,7 @@ fn generate_named_enum_deserialize(
                     ::celkit::core::Error::new(format!(
                         "Missing field `{}` in variant `{}`",
                         #field_name_str,
-                        stringify!(#variant_name),
+                        #variant_name_str,
                     ))
                 })?;
             }
@@ -1218,7 +1419,7 @@ fn generate_named_enum_deserialize(
             let field_name_str = get_field_name(
                 &field_name.to_string(),
                 &field_attributes,
-                container_attributes,
+                &variant_attributes.container,
             );
 
             quote::quote! {
@@ -1228,7 +1429,7 @@ fn generate_named_enum_deserialize(
                         .ok_or_else(|| ::celkit::core::Error::new(format!(
                             "Missing field `{}` in positional deserialization of variant `{}`",
                             #field_name_str,
-                            stringify!(#variant_name),
+                            #variant_name_str,
                         )))?;
 
                     <#field_type>::deserialize(field_value)?
@@ -1242,7 +1443,7 @@ fn generate_named_enum_deserialize(
     };
 
     Ok(quote::quote! {
-        stringify!(#variant_name) => {
+        #(#variant_names)|* => {
             match variant_value {
                 ::celkit::core::Value::Struct(fields) => {
                     #expected_fields_array
@@ -1289,7 +1490,7 @@ fn generate_named_enum_deserialize(
                 }
                 _ => Err(::celkit::core::Error::new(format!(
                     "Expected `struct` for enum variant `{}`",
-                    stringify!(#variant_name),
+                    #variant_name_str,
                 )))
             }
         }
@@ -1300,7 +1501,32 @@ fn generate_unnamed_enum_deserialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
     fields: &syn::FieldsUnnamed,
+    container_attributes: &ContainerAttributes,
+    variant_attributes: &VariantAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    let variant_name_str = get_variant_name(
+        &variant_name.to_string(),
+        &variant_attributes,
+        container_attributes,
+    );
+    let mut variant_names = Vec::from([quote::quote! { #variant_name_str }]);
+
+    for alias in &variant_attributes.alias {
+        variant_names.push(quote::quote! { #alias });
+    }
+
+    if variant_attributes.skip || variant_attributes.skip_deserializing {
+        return Ok(quote::quote! {
+            #(#variant_names)|* => {
+                return Err(::celkit::core::Error::new(format!(
+                    "Enum variant `{}::{}` cannot be deserialized",
+                    stringify!(#name),
+                    stringify!(#variant_name),
+                )));
+            }
+        });
+    }
+
     let field_attributes = fields
         .unnamed
         .iter()
@@ -1370,7 +1596,7 @@ fn generate_unnamed_enum_deserialize(
                         .ok_or_else(|| ::celkit::core::Error::new(format!(
                             "Missing field {} in variant `{}`",
                             #i,
-                            stringify!(#variant_name),
+                            #variant_name_str,
                         )))?
                 )?;
             }
@@ -1379,7 +1605,7 @@ fn generate_unnamed_enum_deserialize(
         .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()));
 
     Ok(quote::quote! {
-        stringify!(#variant_name) => {
+        #(#variant_names)|* => {
             match variant_value {
                 ::celkit::core::Value::Tuple(fields) => {
                     if fields.len() > #field_count {
@@ -1399,7 +1625,7 @@ fn generate_unnamed_enum_deserialize(
                 }
                 _ => Err(::celkit::core::Error::new(format!(
                     "Expected `tuple` for enum variant `{}`",
-                    stringify!(#variant_name),
+                    #variant_name_str,
                 )))
             }
         }
@@ -1409,14 +1635,39 @@ fn generate_unnamed_enum_deserialize(
 fn generate_unit_enum_deserialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
+    container_attributes: &ContainerAttributes,
+    variant_attributes: &VariantAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    let variant_name_str = get_variant_name(
+        &variant_name.to_string(),
+        &variant_attributes,
+        container_attributes,
+    );
+    let mut variant_names = Vec::from([quote::quote! { #variant_name_str }]);
+
+    for alias in &variant_attributes.alias {
+        variant_names.push(quote::quote! { #alias });
+    }
+
+    if variant_attributes.skip || variant_attributes.skip_deserializing {
+        return Ok(quote::quote! {
+            #(#variant_names)|* => {
+                return Err(::celkit::core::Error::new(format!(
+                    "Enum variant `{}::{}` cannot be deserialized",
+                    stringify!(#name),
+                    stringify!(#variant_name),
+                )));
+            }
+        });
+    }
+
     Ok(quote::quote! {
-        stringify!(#variant_name) => {
+        #(#variant_names)|* => {
             match variant_value {
                 ::celkit::core::Value::Null => Ok(#name::#variant_name),
                 _ => Err(::celkit::core::Error::new(format!(
                     "Expected `null` for enum variant `{}`",
-                    stringify!(#variant_name),
+                    #variant_name_str,
                 )))
             }
         }
@@ -1427,6 +1678,7 @@ fn generate_enum_deserialize(
     name: &syn::Ident,
     generics: syn::Generics,
     data: &syn::DataEnum,
+    container_attributes: &ContainerAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
     let generics = insert_trait_bounds(generics, "Deserialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
@@ -1450,8 +1702,7 @@ fn generate_enum_deserialize(
         .map(|variant| {
             let variant_name = &variant.ident;
             let attributes = &variant.attrs;
-            // TODO: Should be parsed as variant_attributes
-            let container_attributes = parse_container_attributes(attributes)?;
+            let variant_attributes = parse_variant_attributes(attributes)?;
 
             match &variant.fields {
                 syn::Fields::Named(fields) => generate_named_enum_deserialize(
@@ -1459,11 +1710,21 @@ fn generate_enum_deserialize(
                     variant_name,
                     fields,
                     &container_attributes,
+                    &variant_attributes,
                 ),
-                syn::Fields::Unnamed(fields) => {
-                    generate_unnamed_enum_deserialize(name, variant_name, fields)
-                }
-                syn::Fields::Unit => generate_unit_enum_deserialize(name, variant_name),
+                syn::Fields::Unnamed(fields) => generate_unnamed_enum_deserialize(
+                    name,
+                    variant_name,
+                    fields,
+                    &container_attributes,
+                    &variant_attributes,
+                ),
+                syn::Fields::Unit => generate_unit_enum_deserialize(
+                    name,
+                    variant_name,
+                    &container_attributes,
+                    &variant_attributes,
+                ),
             }
         })
         .collect::<syn::Result<Vec<_>>>()?;
