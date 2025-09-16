@@ -336,9 +336,10 @@ impl<'a> UnnamedFieldHandler<'a> {
         }
     }
 
-    pub(super) fn field_names(&self) -> impl Iterator<Item = syn::Ident> + '_ {
+    pub(super) fn field_names(&self) -> Vec<syn::Ident> {
         (0..self.fields.len())
             .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()))
+            .collect()
     }
 
     fn field_count(&self) -> usize {

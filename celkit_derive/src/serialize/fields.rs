@@ -4,7 +4,6 @@ use crate::utils::get_field_name;
 
 pub(super) struct NamedField<'a> {
     pub(super) name: &'a syn::Ident,
-    pub(super) ty: &'a syn::Type,
     pub(super) attributes: FieldAttributes,
 }
 
@@ -18,15 +17,10 @@ impl<'a> NamedFieldHandler<'a> {
             .named
             .iter()
             .filter_map(|field| match field.ident.as_ref() {
-                Some(name) => {
-                    Some(
-                        parse_field_attributes(&field.attrs).map(|attributes| NamedField {
-                            name,
-                            ty: &field.ty,
-                            attributes,
-                        }),
-                    )
-                }
+                Some(name) => Some(
+                    parse_field_attributes(&field.attrs)
+                        .map(|attributes| NamedField { name, attributes }),
+                ),
                 None => None,
             })
             .collect::<syn::Result<Vec<_>>>()?;
@@ -73,6 +67,82 @@ impl<'a> NamedFieldHandler<'a> {
     }
 
     fn serializable_fields(&self) -> impl Iterator<Item = &NamedField> {
+        self.fields
+            .iter()
+            .filter(|field| !field.attributes.skip && !field.attributes.skip_serializing)
+    }
+
+    fn field_count(&self) -> usize {
+        self.serializable_fields().count()
+    }
+}
+
+pub(super) struct UnnamedField {
+    pub(super) index: usize,
+    pub(super) attributes: FieldAttributes,
+}
+
+pub(super) struct UnnamedFieldHandler {
+    pub(super) fields: Vec<UnnamedField>,
+}
+
+impl UnnamedFieldHandler {
+    pub fn new(fields: &syn::FieldsUnnamed) -> syn::Result<Self> {
+        let fields = fields
+            .unnamed
+            .iter()
+            .enumerate()
+            .map(|(i, field)| {
+                parse_field_attributes(&field.attrs).map(|attributes| UnnamedField {
+                    index: i,
+                    attributes,
+                })
+            })
+            .collect::<syn::Result<Vec<_>>>()?;
+
+        Ok(Self { fields })
+    }
+
+    pub(super) fn generate_fields_serialize(&self, is_struct: bool) -> proc_macro2::TokenStream {
+        let fields: Vec<_> = self
+            .serializable_fields()
+            .map(|field| {
+                if is_struct {
+                    let index = syn::Index::from(field.index);
+
+                    return quote::quote! {
+                        fields.push((
+                            String::new(),
+                            self.#index.serialize()?
+                        ));
+                    };
+                }
+
+                let field_name = &self.field_names()[field.index];
+
+                quote::quote! {
+                    fields.push(#field_name.serialize()?);
+                }
+            })
+            .collect();
+        let field_count = self.field_count();
+
+        quote::quote! {
+            use ::celkit::core::*;
+
+            let mut fields = Vec::with_capacity(#field_count);
+
+            #(#fields)*
+        }
+    }
+
+    pub(super) fn field_names(&self) -> Vec<syn::Ident> {
+        (0..self.fields.len())
+            .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()))
+            .collect()
+    }
+
+    fn serializable_fields(&self) -> impl Iterator<Item = &UnnamedField> {
         self.fields
             .iter()
             .filter(|field| !field.attributes.skip && !field.attributes.skip_serializing)

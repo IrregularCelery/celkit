@@ -1,8 +1,8 @@
-use crate::attributes::{parse_field_attributes, parse_variant_attributes};
+use crate::attributes::parse_variant_attributes;
 use crate::attributes::{ContainerAttributes, VariantAttributes};
-use crate::utils::{get_field_name, get_variant_name, insert_trait_bounds};
+use crate::utils::{get_variant_name, insert_trait_bounds};
 
-use super::fields::NamedFieldHandler;
+use super::fields::{NamedFieldHandler, UnnamedFieldHandler};
 
 fn generate_named_enum_serialize(
     name: &syn::Ident,
@@ -66,28 +66,9 @@ fn generate_unnamed_enum_serialize(
         });
     }
 
-    let field_names: Vec<_> = (0..fields.unnamed.len())
-        .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()))
-        .collect();
-    let serializable_fields: Vec<_> = fields
-        .unnamed
-        .iter()
-        .enumerate()
-        .map(|(i, field)| {
-            parse_field_attributes(&field.attrs).map(|attributes| (i, field, attributes))
-        })
-        .collect::<syn::Result<Vec<_>>>()?
-        .into_iter()
-        .filter(|(_, _, attributes)| !attributes.skip && !attributes.skip_serializing)
-        .collect();
-    let field_count = serializable_fields.len();
-    let fields = serializable_fields.iter().map(|(i, _, _)| {
-        let field_name = &field_names[*i];
-
-        quote::quote! {
-            fields.push(#field_name.serialize()?);
-        }
-    });
+    let field_handler = UnnamedFieldHandler::new(fields)?;
+    let field_names = field_handler.field_names();
+    let field_serialization = field_handler.generate_fields_serialize(false);
     let variant_name_str = get_variant_name(
         &variant_name.to_string(),
         &variant_attributes,
@@ -96,11 +77,7 @@ fn generate_unnamed_enum_serialize(
 
     Ok(quote::quote! {
         #name::#variant_name(#(#field_names),*) => {
-            use ::celkit::core::*;
-
-            let mut fields = Vec::with_capacity(#field_count);
-
-            #(#fields)*
+            #field_serialization
 
             let variant_value = ::celkit::core::Value::Tuple(fields);
             let mut variant_object = BTreeMap::new();
