@@ -1,5 +1,4 @@
 mod attributes;
-mod common;
 mod deserialize;
 mod serialize;
 mod utils;

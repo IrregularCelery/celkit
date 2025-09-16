@@ -61,14 +61,14 @@ fn generate_named_enum_deserialize(
         })
     };
     let context_name = format!("variant `{}::{}`", name.to_string(), variant_name_str);
-    let deserialization =
-        field_handler.generate_named_fields_deserialize(construction, &context_name);
+    let field_deserialization =
+        field_handler.generate_fields_deserialize(construction, &context_name);
 
     Ok(quote::quote! {
         #(#variant_names)|* => {
             match variant_value {
                 ::celkit::core::Value::Struct(fields) => {
-                    #deserialization
+                    #field_deserialization
                 }
                 _ => Err(::celkit::core::Error::new(format!(
                     "Expected `struct` for enum variant `{}::{}`",
@@ -111,21 +111,18 @@ fn generate_unnamed_enum_deserialize(
     }
 
     let field_handler = UnnamedFieldHandler::new(fields)?;
-    let field_idents = field_handler.field_idents();
-    let construction = quote::quote! { Ok(#name::#variant_name(#(#field_idents),*)) };
+    let field_names = field_handler.field_names();
+    let construction = quote::quote! { Ok(#name::#variant_name(#(#field_names),*)) };
     let context_name = format!("variant `{}::{}`", name.to_string(), variant_name_str);
     let fields_format = quote::quote! { field_value };
-    let deserialization = field_handler.generate_unnamed_fields_deserialize(
-        construction,
-        &context_name,
-        fields_format,
-    );
+    let field_deserialization =
+        field_handler.generate_fields_deserialize(construction, &context_name, fields_format);
 
     Ok(quote::quote! {
         #(#variant_names)|* => {
             match variant_value {
                 ::celkit::core::Value::Tuple(fields) => {
-                    #deserialization
+                    #field_deserialization
                 }
                 _ => Err(::celkit::core::Error::new(format!(
                     "Expected `tuple` for enum variant `{}::{}`",

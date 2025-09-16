@@ -37,15 +37,15 @@ fn generate_named_struct_deserialize(
         })
     };
     let context_name = format!("struct `{}`", name);
-    let deserialization =
-        field_handler.generate_named_fields_deserialize(construction, &context_name);
+    let field_deserialization =
+        field_handler.generate_fields_deserialize(construction, &context_name);
 
     Ok(quote::quote! {
         impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
                     ::celkit::core::Value::Struct(fields) => {
-                        #deserialization
+                        #field_deserialization
                     }
                     _ => Err(::celkit::core::Error::new(format!(
                         "Expected `{}` struct",
@@ -63,15 +63,12 @@ fn generate_unnamed_struct_deserialize(
     fields: &syn::FieldsUnnamed,
 ) -> syn::Result<proc_macro2::TokenStream> {
     let field_handler = UnnamedFieldHandler::new(fields)?;
-    let field_idents = field_handler.field_idents();
-    let construction = quote::quote! { Ok(#name(#(#field_idents),*)) };
+    let field_names = field_handler.field_names();
+    let construction = quote::quote! { Ok(#name(#(#field_names),*)) };
     let context_name = format!("struct `{}`", name);
     let fields_format = quote::quote! { (_, field_value) };
-    let deserialization = field_handler.generate_unnamed_fields_deserialize(
-        construction,
-        &context_name,
-        fields_format,
-    );
+    let field_deserialization =
+        field_handler.generate_fields_deserialize(construction, &context_name, fields_format);
     let generics = insert_trait_bounds(generics, "Deserialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
@@ -80,7 +77,7 @@ fn generate_unnamed_struct_deserialize(
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
                     ::celkit::core::Value::Struct(fields) => {
-                        #deserialization
+                        #field_deserialization
                     }
                     _ => Err(::celkit::core::Error::new(format!(
                         "Expected `{}` struct",

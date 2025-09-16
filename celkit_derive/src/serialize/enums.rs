@@ -2,6 +2,8 @@ use crate::attributes::{parse_field_attributes, parse_variant_attributes};
 use crate::attributes::{ContainerAttributes, VariantAttributes};
 use crate::utils::{get_field_name, get_variant_name, insert_trait_bounds};
 
+use super::fields::NamedFieldHandler;
+
 fn generate_named_enum_serialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
@@ -21,39 +23,10 @@ fn generate_named_enum_serialize(
         });
     }
 
-    let field_names: Vec<_> = fields
-        .named
-        .iter()
-        .filter_map(|f| f.ident.as_ref())
-        .collect();
-    let serializable_fields: Vec<_> = fields
-        .named
-        .iter()
-        .map(|field| parse_field_attributes(&field.attrs).map(|attributes| (field, attributes)))
-        .collect::<syn::Result<Vec<_>>>()?
-        .into_iter()
-        .filter(|(_, attributes)| !attributes.skip && !attributes.skip_serializing)
-        .collect();
-    let field_count = serializable_fields.len();
-    let fields = serializable_fields.iter().map(|(field, field_attributes)| {
-        let Some(field_name) = &field.ident else {
-            return syn::Error::new_spanned(field, "Named fields must have an `identifier`")
-                .to_compile_error();
-        };
-
-        let field_name_str = get_field_name(
-            &field_name.to_string(),
-            field_attributes,
-            &variant_attributes.container,
-        );
-
-        quote::quote! {
-            fields.push((
-                #field_name_str.to_string(),
-                #field_name.serialize()?
-            ));
-        }
-    });
+    let field_handler = NamedFieldHandler::new(fields)?;
+    let field_names = field_handler.field_names();
+    let field_serialization =
+        field_handler.generate_fields_serialize(&variant_attributes.container, quote::quote! {});
     let variant_name_str = get_variant_name(
         &variant_name.to_string(),
         &variant_attributes,
@@ -62,11 +35,7 @@ fn generate_named_enum_serialize(
 
     Ok(quote::quote! {
         #name::#variant_name { #(#field_names),* } => {
-            use ::celkit::core::*;
-
-            let mut fields = Vec::with_capacity(#field_count);
-
-            #(#fields)*
+            #field_serialization
 
             let variant_value = ::celkit::core::Value::Struct(fields);
             let mut variant_object = BTreeMap::new();

@@ -41,7 +41,7 @@ impl<'a> NamedFieldHandler<'a> {
         })
     }
 
-    pub(super) fn generate_named_fields_deserialize(
+    pub(super) fn generate_fields_deserialize(
         &self,
         construction: proc_macro2::TokenStream,
         context_name: &str,
@@ -308,7 +308,7 @@ impl<'a> UnnamedFieldHandler<'a> {
         })
     }
 
-    pub(super) fn generate_unnamed_fields_deserialize(
+    pub(super) fn generate_fields_deserialize(
         &self,
         construction: proc_macro2::TokenStream,
         context_name: &str,
@@ -336,7 +336,7 @@ impl<'a> UnnamedFieldHandler<'a> {
         }
     }
 
-    pub(super) fn field_idents(&self) -> impl Iterator<Item = syn::Ident> + '_ {
+    pub(super) fn field_names(&self) -> impl Iterator<Item = syn::Ident> + '_ {
         (0..self.fields.len())
             .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()))
     }
