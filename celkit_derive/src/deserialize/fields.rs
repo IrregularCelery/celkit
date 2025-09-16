@@ -41,6 +41,62 @@ impl<'a> NamedFieldHandler<'a> {
         })
     }
 
+    pub(super) fn generate_named_fields_deserialize(
+        &self,
+        construction: proc_macro2::TokenStream,
+        context_name: &str,
+    ) -> proc_macro2::TokenStream {
+        let expected_fields_array = self.generate_expected_fields_array();
+        let field_declarations = self.generate_field_declarations();
+        let field_matching = self.generate_field_matching();
+        let field_assignments = self.generate_field_assignments(context_name);
+        let field_assignments_positional = self.generate_field_assignments_positional(context_name);
+
+        quote::quote! {
+            #expected_fields_array
+            let mut positional = false;
+
+            if fields.len() == expected_fields.len() {
+                positional = true;
+
+                for (i, (field_name, _)) in fields.iter().enumerate() {
+                    if field_name.is_empty() {
+                        // Order must be correct or error
+                        break;
+                    }
+
+                    if expected_fields[i] != field_name {
+                        // Order isn't correct
+                        positional = false;
+
+                        break;
+                    }
+                }
+            }
+
+            // Ordered, we match the expected fields
+            if positional {
+                let mut fields_iter = fields.into_iter();
+
+                #(#field_assignments_positional)*
+
+                return #construction;
+            }
+
+            #(#field_declarations)*
+
+            // Unordered, we search for the values by names
+            for (field_name, field_value) in fields {
+                #(#field_matching)*
+            }
+
+            // Check whether all of the fields were found
+            #(#field_assignments)*
+
+            #construction
+        }
+    }
+
     pub(super) fn field_names(&self) -> Vec<&syn::Ident> {
         self.fields.iter().map(|field| field.name).collect()
     }
@@ -252,16 +308,44 @@ impl<'a> UnnamedFieldHandler<'a> {
         })
     }
 
-    pub(super) fn field_count(&self) -> usize {
-        self.fields
-            .iter()
-            .filter(|field| !field.attributes.skip && !field.attributes.skip_deserializing)
-            .count()
+    pub(super) fn generate_unnamed_fields_deserialize(
+        &self,
+        construction: proc_macro2::TokenStream,
+        context_name: &str,
+        fields_format: proc_macro2::TokenStream,
+    ) -> proc_macro2::TokenStream {
+        let field_count = self.field_count();
+        let field_assignments = self.generate_field_assignments(context_name, fields_format);
+        let context = context_name.to_string();
+
+        quote::quote! {
+            if fields.len() > #field_count {
+                return Err(::celkit::core::Error::new(format!(
+                    "Too many fields for {}, expected {}, got {}",
+                    #context,
+                    #field_count,
+                    fields.len(),
+                )));
+            }
+
+            let mut fields_iter = fields.into_iter();
+
+            #(#field_assignments)*
+
+            #construction
+        }
     }
 
     pub(super) fn field_idents(&self) -> impl Iterator<Item = syn::Ident> + '_ {
         (0..self.fields.len())
             .map(|i| syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site()))
+    }
+
+    fn field_count(&self) -> usize {
+        self.fields
+            .iter()
+            .filter(|field| !field.attributes.skip && !field.attributes.skip_deserializing)
+            .count()
     }
 
     fn generate_field_assignments(
@@ -311,90 +395,5 @@ impl<'a> UnnamedFieldHandler<'a> {
                 }
             })
             .collect()
-    }
-}
-
-pub(super) fn generate_named_fields_deserialize(
-    field_handler: &NamedFieldHandler,
-    construction: proc_macro2::TokenStream,
-    context_name: &str,
-) -> proc_macro2::TokenStream {
-    let expected_fields_array = field_handler.generate_expected_fields_array();
-    let field_declarations = field_handler.generate_field_declarations();
-    let field_matching = field_handler.generate_field_matching();
-    let field_assignments = field_handler.generate_field_assignments(context_name);
-    let field_assignments_positional =
-        field_handler.generate_field_assignments_positional(context_name);
-
-    quote::quote! {
-        #expected_fields_array
-        let mut positional = false;
-
-        if fields.len() == expected_fields.len() {
-            positional = true;
-
-            for (i, (field_name, _)) in fields.iter().enumerate() {
-                if field_name.is_empty() {
-                    // Order must be correct or error
-                    break;
-                }
-
-                if expected_fields[i] != field_name {
-                    // Order isn't correct
-                    positional = false;
-
-                    break;
-                }
-            }
-        }
-
-        // Ordered, we match the expected fields
-        if positional {
-            let mut fields_iter = fields.into_iter();
-
-            #(#field_assignments_positional)*
-
-            return #construction;
-        }
-
-        #(#field_declarations)*
-
-        // Unordered, we search for the values by names
-        for (field_name, field_value) in fields {
-            #(#field_matching)*
-        }
-
-        // Check whether all of the fields were found
-        #(#field_assignments)*
-
-        #construction
-    }
-}
-
-pub(super) fn generate_unnamed_fields_deserialize(
-    field_handler: &UnnamedFieldHandler,
-    construction: proc_macro2::TokenStream,
-    context_name: &str,
-    fields_format: proc_macro2::TokenStream,
-) -> proc_macro2::TokenStream {
-    let field_count = field_handler.field_count();
-    let field_assignments = field_handler.generate_field_assignments(context_name, fields_format);
-    let context = context_name.to_string();
-
-    quote::quote! {
-        if fields.len() > #field_count {
-            return Err(::celkit::core::Error::new(format!(
-                "Too many fields for {}, expected {}, got {}",
-                #context,
-                #field_count,
-                fields.len(),
-            )));
-        }
-
-        let mut fields_iter = fields.into_iter();
-
-        #(#field_assignments)*
-
-        #construction
     }
 }

@@ -2,8 +2,8 @@ use crate::attributes::parse_variant_attributes;
 use crate::attributes::{ContainerAttributes, VariantAttributes};
 use crate::utils::{get_variant_name, insert_trait_bounds};
 
-use super::fields::{generate_named_fields_deserialize, UnnamedFieldHandler};
-use super::fields::{generate_unnamed_fields_deserialize, NamedFieldHandler};
+use super::fields::NamedFieldHandler;
+use super::fields::UnnamedFieldHandler;
 
 fn generate_named_enum_deserialize(
     name: &syn::Ident,
@@ -62,7 +62,7 @@ fn generate_named_enum_deserialize(
     };
     let context_name = format!("variant `{}::{}`", name.to_string(), variant_name_str);
     let deserialization =
-        generate_named_fields_deserialize(&field_handler, construction, &context_name);
+        field_handler.generate_named_fields_deserialize(construction, &context_name);
 
     Ok(quote::quote! {
         #(#variant_names)|* => {
@@ -115,8 +115,7 @@ fn generate_unnamed_enum_deserialize(
     let construction = quote::quote! { Ok(#name::#variant_name(#(#field_idents),*)) };
     let context_name = format!("variant `{}::{}`", name.to_string(), variant_name_str);
     let fields_format = quote::quote! { field_value };
-    let deserialization = generate_unnamed_fields_deserialize(
-        &field_handler,
+    let deserialization = field_handler.generate_unnamed_fields_deserialize(
         construction,
         &context_name,
         fields_format,

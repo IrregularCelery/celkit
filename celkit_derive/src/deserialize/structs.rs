@@ -1,8 +1,6 @@
 use crate::attributes::ContainerAttributes;
 use crate::utils::insert_trait_bounds;
 
-use super::fields::generate_named_fields_deserialize;
-use super::fields::generate_unnamed_fields_deserialize;
 use super::fields::NamedFieldHandler;
 use super::fields::UnnamedFieldHandler;
 
@@ -40,7 +38,7 @@ fn generate_named_struct_deserialize(
     };
     let context_name = format!("struct `{}`", name);
     let deserialization =
-        generate_named_fields_deserialize(&field_handler, construction, &context_name);
+        field_handler.generate_named_fields_deserialize(construction, &context_name);
 
     Ok(quote::quote! {
         impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
@@ -69,8 +67,7 @@ fn generate_unnamed_struct_deserialize(
     let construction = quote::quote! { Ok(#name(#(#field_idents),*)) };
     let context_name = format!("struct `{}`", name);
     let fields_format = quote::quote! { (_, field_value) };
-    let deserialization = generate_unnamed_fields_deserialize(
-        &field_handler,
+    let deserialization = field_handler.generate_unnamed_fields_deserialize(
         construction,
         &context_name,
         fields_format,
