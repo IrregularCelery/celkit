@@ -41,8 +41,8 @@ impl<'a> NamedFieldHandler<'a> {
         })
     }
 
-    pub(super) fn field_names(&self) -> impl Iterator<Item = &syn::Ident> + '_ {
-        self.fields.iter().map(|field| field.name)
+    pub(super) fn field_names(&self) -> Vec<&syn::Ident> {
+        self.fields.iter().map(|field| field.name).collect()
     }
 
     fn generate_expected_fields_array(&self) -> proc_macro2::TokenStream {
@@ -63,18 +63,21 @@ impl<'a> NamedFieldHandler<'a> {
         }
     }
 
-    fn generate_field_declarations(&self) -> impl Iterator<Item = proc_macro2::TokenStream> + '_ {
-        self.fields.iter().map(|field| {
-            let field_name = field.name;
-            let field_type = field.ty;
+    fn generate_field_declarations(&self) -> Vec<proc_macro2::TokenStream> {
+        self.fields
+            .iter()
+            .map(|field| {
+                let field_name = field.name;
+                let field_type = field.ty;
 
-            quote::quote! {
-                let mut #field_name: Option<#field_type> = None;
-            }
-        })
+                quote::quote! {
+                    let mut #field_name: Option<#field_type> = None;
+                }
+            })
+            .collect()
     }
 
-    fn generate_field_matching(&self) -> impl Iterator<Item = proc_macro2::TokenStream> + '_ {
+    fn generate_field_matching(&self) -> Vec<proc_macro2::TokenStream> {
         self.fields
             .iter()
             .filter(|field| !field.attributes.skip && !field.attributes.skip_deserializing)
@@ -100,84 +103,88 @@ impl<'a> NamedFieldHandler<'a> {
                     }
                 }
             })
+            .collect()
     }
 
-    fn generate_field_assignments(
-        &self,
-        context_name: &str,
-    ) -> impl Iterator<Item = proc_macro2::TokenStream> + '_ {
+    fn generate_field_assignments(&self, context_name: &str) -> Vec<proc_macro2::TokenStream> {
         let context = context_name.to_string();
 
-        self.fields.iter().map(move |field| {
-            let field_name = field.name;
-            let field_type = field.ty;
+        self.fields
+            .iter()
+            .map(move |field| {
+                let field_name = field.name;
+                let field_type = field.ty;
 
-            if field.attributes.skip || field.attributes.skip_deserializing {
-                return quote::quote! {
-                    let #field_name = <#field_type>::default();
-                };
-            }
+                if field.attributes.skip || field.attributes.skip_deserializing {
+                    return quote::quote! {
+                        let #field_name = <#field_type>::default();
+                    };
+                }
 
-            if field.attributes.default {
-                return quote::quote! {
-                    let #field_name = #field_name.unwrap_or_else(|| <#field_type>::default());
-                };
-            }
+                if field.attributes.default {
+                    return quote::quote! {
+                        let #field_name = #field_name.unwrap_or_else(|| <#field_type>::default());
+                    };
+                }
 
-            let field_name_str = get_field_name(
-                &field.name.to_string(),
-                &field.attributes,
-                self.container_attributes,
-            );
+                let field_name_str = get_field_name(
+                    &field.name.to_string(),
+                    &field.attributes,
+                    self.container_attributes,
+                );
 
-            quote::quote! {
-                let #field_name = #field_name.ok_or_else(|| {
-                    ::celkit::core::Error::new(format!(
-                        "Missing field `{}` in {}",
-                        #field_name_str,
-                        #context,
-                    ))
-                })?;
-            }
-        })
+                quote::quote! {
+                    let #field_name = #field_name.ok_or_else(|| {
+                        ::celkit::core::Error::new(format!(
+                            "Missing field `{}` in {}",
+                            #field_name_str,
+                            #context,
+                        ))
+                    })?;
+                }
+            })
+            .collect()
     }
 
     fn generate_field_assignments_positional(
         &self,
         context_name: &str,
-    ) -> impl Iterator<Item = proc_macro2::TokenStream> + '_ {
+    ) -> Vec<proc_macro2::TokenStream> {
         let context = context_name.to_string();
 
-        self.fields.iter().map(move |field| {
-            let field_name = field.name;
-            let field_type = field.ty;
+        self.fields
+            .iter()
+            .map(move |field| {
+                let field_name = field.name;
+                let field_type = field.ty;
 
-            if field.attributes.skip || field.attributes.skip_deserializing {
-                return quote::quote! {
-                    let #field_name = <#field_type>::default();
-                };
-            }
+                if field.attributes.skip || field.attributes.skip_deserializing {
+                    return quote::quote! {
+                        let #field_name = <#field_type>::default();
+                    };
+                }
 
-            let field_name_str = get_field_name(
-                &field.name.to_string(),
-                &field.attributes,
-                self.container_attributes,
-            );
+                let field_name_str = get_field_name(
+                    &field.name.to_string(),
+                    &field.attributes,
+                    self.container_attributes,
+                );
 
-            quote::quote! {
-                let #field_name = {
-                    let (_, field_value) = fields_iter
-                        .next()
-                        .ok_or_else(|| ::celkit::core::Error::new(format!(
-                            "Missing field `{}` in positional deserialization of {}",
-                            #field_name_str,
-                            #context,
-                        )))?;
+                quote::quote! {
+                    let #field_name = {
+                        let (_, field_value) = fields_iter
+                            .next()
+                            .ok_or_else(|| ::celkit::core::Error::new(format!(
+                                "Missing field `{}` in positional deserialization of {}",
+                                #field_name_str,
+                                #context,
+                            )))?;
 
-                    <#field_type>::deserialize(field_value)?
-                };
-            }
-        })
+                        <#field_type>::deserialize(field_value)?
+                    };
+                }
+            })
+            .collect()
     }
 }
 
@@ -192,16 +199,23 @@ pub(super) struct UnnamedFieldHandler<'a> {
 
 impl<'a> UnnamedFieldHandler<'a> {
     pub fn new(fields: &'a syn::FieldsUnnamed) -> syn::Result<Self> {
-        let field_types: Vec<_> = fields.unnamed.iter().map(|f| &f.ty).collect();
-        let field_attributes = fields
-            .unnamed
-            .iter()
-            .map(|field| parse_field_attributes(&field.attrs))
-            .collect::<syn::Result<Vec<_>>>()?;
         let mut errors: Option<syn::Error> = None;
         let mut has_default_field = false;
+        let mut handled_fields = Vec::new();
 
-        for (i, attributes) in field_attributes.iter().enumerate() {
+        for (i, field) in fields.unnamed.iter().enumerate() {
+            let attributes = match parse_field_attributes(&field.attrs) {
+                Ok(attributes) => attributes,
+                Err(e) => {
+                    match errors {
+                        Some(ref mut errors) => errors.combine(e),
+                        None => errors = Some(e),
+                    }
+
+                    continue;
+                }
+            };
+
             if has_default_field
                 && !attributes.default
                 && !attributes.skip
@@ -222,19 +236,20 @@ impl<'a> UnnamedFieldHandler<'a> {
             if attributes.default {
                 has_default_field = true;
             }
+
+            handled_fields.push(UnnamedField {
+                ty: &field.ty,
+                attributes,
+            });
         }
 
-        if let Some(errors) = errors {
-            return Err(errors);
+        if let Some(e) = errors {
+            return Err(e);
         }
 
-        let fields = field_types
-            .into_iter()
-            .zip(field_attributes)
-            .map(|(ty, attributes)| UnnamedField { ty, attributes })
-            .collect();
-
-        Ok(Self { fields })
+        Ok(Self {
+            fields: handled_fields,
+        })
     }
 
     pub(super) fn field_count(&self) -> usize {
@@ -253,45 +268,49 @@ impl<'a> UnnamedFieldHandler<'a> {
         &self,
         context_name: &str,
         fields_format: proc_macro2::TokenStream,
-    ) -> impl Iterator<Item = proc_macro2::TokenStream> + '_ {
+    ) -> Vec<proc_macro2::TokenStream> {
         let context = context_name.to_string();
 
-        self.fields.iter().enumerate().map(move |(i, field)| {
-            let field_type = field.ty;
-            let field_attributes = &field.attributes;
+        self.fields
+            .iter()
+            .enumerate()
+            .map(move |(i, field)| {
+                let field_type = field.ty;
+                let field_attributes = &field.attributes;
 
-            let field_ident =
-                syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site());
+                let field_ident =
+                    syn::Ident::new(&format!("field_{}", i), proc_macro2::Span::call_site());
 
-            if field_attributes.skip || field_attributes.skip_deserializing {
-                return quote::quote! {
-                    let #field_ident = <#field_type>::default();
-                };
-            }
-
-            if field_attributes.default {
-                return quote::quote! {
-                    let #field_ident = match fields_iter.next() {
-                        Some(#fields_format) => <#field_type>::deserialize(field_value)?,
-                        None => <#field_type>::default(),
+                if field_attributes.skip || field_attributes.skip_deserializing {
+                    return quote::quote! {
+                        let #field_ident = <#field_type>::default();
                     };
-                };
-            }
+                }
 
-            quote::quote! {
-                let #field_ident = {
-                    let #fields_format = fields_iter
-                        .next()
-                        .ok_or_else(|| ::celkit::core::Error::new(format!(
-                            "Missing field {} in {}",
-                            #i,
-                            #context
-                        )))?;
+                if field_attributes.default {
+                    return quote::quote! {
+                        let #field_ident = match fields_iter.next() {
+                            Some(#fields_format) => <#field_type>::deserialize(field_value)?,
+                            None => <#field_type>::default(),
+                        };
+                    };
+                }
 
-                    <#field_type>::deserialize(field_value)?
-                };
-            }
-        })
+                quote::quote! {
+                    let #field_ident = {
+                        let #fields_format = fields_iter
+                            .next()
+                            .ok_or_else(|| ::celkit::core::Error::new(format!(
+                                "Missing field {} in {}",
+                                #i,
+                                #context
+                            )))?;
+
+                        <#field_type>::deserialize(field_value)?
+                    };
+                }
+            })
+            .collect()
     }
 }
 
@@ -301,14 +320,11 @@ pub(super) fn generate_named_fields_deserialize(
     context_name: &str,
 ) -> proc_macro2::TokenStream {
     let expected_fields_array = field_handler.generate_expected_fields_array();
-    let field_declarations: Vec<_> = field_handler.generate_field_declarations().collect();
-    let field_matching: Vec<_> = field_handler.generate_field_matching().collect();
-    let field_assignments: Vec<_> = field_handler
-        .generate_field_assignments(context_name)
-        .collect();
-    let field_assignments_positional: Vec<_> = field_handler
-        .generate_field_assignments_positional(context_name)
-        .collect();
+    let field_declarations = field_handler.generate_field_declarations();
+    let field_matching = field_handler.generate_field_matching();
+    let field_assignments = field_handler.generate_field_assignments(context_name);
+    let field_assignments_positional =
+        field_handler.generate_field_assignments_positional(context_name);
 
     quote::quote! {
         #expected_fields_array
@@ -362,9 +378,7 @@ pub(super) fn generate_unnamed_fields_deserialize(
     fields_format: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     let field_count = field_handler.field_count();
-    let field_assignments: Vec<_> = field_handler
-        .generate_field_assignments(context_name, fields_format)
-        .collect();
+    let field_assignments = field_handler.generate_field_assignments(context_name, fields_format);
     let context = context_name.to_string();
 
     quote::quote! {

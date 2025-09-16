@@ -36,7 +36,7 @@ fn generate_named_enum_deserialize(
     }
 
     let field_handler = NamedFieldHandler::new(fields, &variant_attributes.container)?;
-    let field_names: Vec<_> = field_handler.field_names().collect();
+    let field_names = field_handler.field_names();
 
     if field_names.is_empty() {
         return Ok(quote::quote! {

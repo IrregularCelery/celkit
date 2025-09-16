@@ -13,7 +13,7 @@ fn generate_named_struct_deserialize(
     container_attributes: &ContainerAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
     let field_handler = NamedFieldHandler::new(fields, container_attributes)?;
-    let field_names: Vec<_> = field_handler.field_names().collect();
+    let field_names = field_handler.field_names();
     let generics = insert_trait_bounds(generics, "Deserialize");
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
