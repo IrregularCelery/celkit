@@ -1,4 +1,5 @@
 mod enums;
+mod fields;
 mod structs;
 
 use enums::generate_enum_deserialize;
