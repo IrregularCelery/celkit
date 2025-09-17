@@ -4,8 +4,7 @@ pub use celkit_core::{Deserialize, Serialize};
 
 pub mod core {
     pub use celkit_core::internal::sys::*;
-    pub use celkit_core::internal::utils;
-    pub use celkit_core::internal::{Error, Result, Value};
+    pub use celkit_core::internal::{Error, Number, Result, Value};
 }
 
 #[cfg(feature = "string")]
