@@ -18,6 +18,47 @@ pub enum Number {
     F64(f64),
 }
 
+impl Number {
+    pub fn as_f64(&self) -> f64 {
+        match self {
+            Number::U8(n) => *n as f64,
+            Number::I8(n) => *n as f64,
+            Number::U16(n) => *n as f64,
+            Number::I16(n) => *n as f64,
+            Number::U32(n) => *n as f64,
+            Number::I32(n) => *n as f64,
+            Number::U64(n) => *n as f64,
+            Number::I64(n) => *n as f64,
+            Number::U128(n) => *n as f64,
+            Number::I128(n) => *n as f64,
+            Number::Usize(n) => *n as f64,
+            Number::Isize(n) => *n as f64,
+            Number::F32(n) => *n as f64,
+            Number::F64(n) => *n as f64,
+        }
+    }
+
+    pub fn equals(&self, other: impl Into<Number>) -> bool {
+        match (self, other.into()) {
+            (Number::U8(a), Number::U8(b)) => *a == b,
+            (Number::I8(a), Number::I8(b)) => *a == b,
+            (Number::U16(a), Number::U16(b)) => *a == b,
+            (Number::I16(a), Number::I16(b)) => *a == b,
+            (Number::U32(a), Number::U32(b)) => *a == b,
+            (Number::I32(a), Number::I32(b)) => *a == b,
+            (Number::U64(a), Number::U64(b)) => *a == b,
+            (Number::I64(a), Number::I64(b)) => *a == b,
+            (Number::U128(a), Number::U128(b)) => *a == b,
+            (Number::I128(a), Number::I128(b)) => *a == b,
+            (Number::Usize(a), Number::Usize(b)) => *a == b,
+            (Number::Isize(a), Number::Isize(b)) => *a == b,
+            (Number::F32(a), Number::F32(b)) => (*a - b).abs() < f32::EPSILON,
+            (Number::F64(a), Number::F64(b)) => (*a - b).abs() < f64::EPSILON,
+            (a, b) => a.as_f64() == b.as_f64(),
+        }
+    }
+}
+
 impl core::fmt::Display for Number {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -38,6 +79,31 @@ impl core::fmt::Display for Number {
         }
     }
 }
+
+macro_rules! impl_from_for_number {
+    ($type:ty, $variant:ident) => {
+        impl From<$type> for Number {
+            fn from(value: $type) -> Self {
+                Self::$variant(value)
+            }
+        }
+    };
+}
+
+impl_from_for_number!(u8, U8);
+impl_from_for_number!(i8, I8);
+impl_from_for_number!(u16, U16);
+impl_from_for_number!(i16, I16);
+impl_from_for_number!(u32, U32);
+impl_from_for_number!(i32, I32);
+impl_from_for_number!(u64, U64);
+impl_from_for_number!(i64, I64);
+impl_from_for_number!(u128, U128);
+impl_from_for_number!(i128, I128);
+impl_from_for_number!(usize, Usize);
+impl_from_for_number!(isize, Isize);
+impl_from_for_number!(f32, F32);
+impl_from_for_number!(f64, F64);
 
 #[derive(Debug, Clone)]
 pub enum Value {

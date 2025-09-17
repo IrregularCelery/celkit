@@ -1029,12 +1029,8 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
                     .expect("This SHOULD never happen because of length check!");
 
                 match discriminant {
-                    Value::Number(number) if number == Number::U8(1) => {
-                        Ok(Ok(T::deserialize(value)?))
-                    }
-                    Value::Number(number) if number == Number::U8(0) => {
-                        Ok(Err(E::deserialize(value)?))
-                    }
+                    Value::Number(number) if number.equals(1) => Ok(Ok(T::deserialize(value)?)),
+                    Value::Number(number) if number.equals(0) => Ok(Err(E::deserialize(value)?)),
                     _ => Err(Error::new("Invalid `Result` discriminant, expected 1 or 0")),
                 }
             }
@@ -1055,12 +1051,8 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
                     .expect("This SHOULD never happen because of length check!");
 
                 match discriminant {
-                    Value::Number(number) if number == Number::U8(1) => {
-                        Ok(Ok(T::deserialize(value)?))
-                    }
-                    Value::Number(number) if number == Number::U8(0) => {
-                        Ok(Err(E::deserialize(value)?))
-                    }
+                    Value::Number(number) if number.equals(1) => Ok(Ok(T::deserialize(value)?)),
+                    Value::Number(number) if number.equals(0) => Ok(Err(E::deserialize(value)?)),
                     _ => Err(Error::new("Invalid `Result` discriminant, expected 1 or 0")),
                 }
             }
