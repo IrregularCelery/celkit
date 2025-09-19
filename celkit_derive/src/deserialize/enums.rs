@@ -5,61 +5,66 @@ use crate::utils::{get_variant_name, insert_trait_bounds};
 use super::fields::NamedFieldHandler;
 use super::fields::UnnamedFieldHandler;
 
-fn generate_variant_pattern(
-    variant_name_str: String,
-    variant_index: usize,
-    variant_attributes: &VariantAttributes,
-    by_index: bool,
-) -> proc_macro2::TokenStream {
-    if by_index {
-        let index_lit =
-            syn::LitInt::new(&variant_index.to_string(), proc_macro2::Span::call_site());
-
-        return quote::quote! { #index_lit };
-    }
-
-    let mut variant_names = Vec::from([quote::quote! { #variant_name_str }]);
-
-    for alias in &variant_attributes.alias {
-        variant_names.push(quote::quote! { #alias });
-    }
-
-    quote::quote! { #(#variant_names)|* }
-}
-
-fn generate_named_enum_deserialize(
-    name: &syn::Ident,
+fn process_variant(
     variant_name: &syn::Ident,
     variant_index: usize,
-    fields: &syn::FieldsNamed,
-    container_attributes: &ContainerAttributes,
     variant_attributes: &VariantAttributes,
+    container_attributes: &ContainerAttributes,
+    enum_name: &syn::Ident,
     by_index: bool,
-) -> syn::Result<proc_macro2::TokenStream> {
+) -> Result<
+    (
+        String,                   /* variant_name_str */
+        proc_macro2::TokenStream, /* pattern */
+    ),
+    proc_macro2::TokenStream,
+> {
     let variant_name_str = get_variant_name(
         &variant_name.to_string(),
         &variant_attributes,
         container_attributes,
     );
-    let pattern = generate_variant_pattern(
-        variant_name_str.clone(),
-        variant_index,
-        variant_attributes,
-        by_index,
-    );
+    let pattern = match by_index {
+        true => {
+            let index_lit =
+                syn::LitInt::new(&variant_index.to_string(), proc_macro2::Span::call_site());
+
+            quote::quote! { #index_lit }
+        }
+        false => {
+            let mut variant_names = Vec::from([quote::quote! { #variant_name_str }]);
+
+            for alias in &variant_attributes.alias {
+                variant_names.push(quote::quote! { #alias });
+            }
+
+            quote::quote! { #(#variant_names)|* }
+        }
+    };
 
     if variant_attributes.skip || variant_attributes.skip_deserializing {
-        return Ok(quote::quote! {
+        return Err(quote::quote! {
             #pattern => {
                 return Err(::celkit::core::Error::new(format!(
                     "Enum variant `{}::{}` cannot be deserialized",
-                    stringify!(#name),
+                    stringify!(#enum_name),
                     stringify!(#variant_name),
                 )));
             }
         });
     }
 
+    Ok((variant_name_str, pattern))
+}
+
+fn generate_named_enum_deserialize(
+    name: &syn::Ident,
+    variant_name: &syn::Ident,
+    variant_name_str: String,
+    fields: &syn::FieldsNamed,
+    variant_attributes: &VariantAttributes,
+    pattern: proc_macro2::TokenStream,
+) -> syn::Result<proc_macro2::TokenStream> {
     let field_handler = NamedFieldHandler::new(fields, &variant_attributes.container)?;
     let field_names = field_handler.field_names();
 
@@ -108,36 +113,10 @@ fn generate_named_enum_deserialize(
 fn generate_unnamed_enum_deserialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
-    variant_index: usize,
+    variant_name_str: String,
     fields: &syn::FieldsUnnamed,
-    container_attributes: &ContainerAttributes,
-    variant_attributes: &VariantAttributes,
-    by_index: bool,
+    pattern: proc_macro2::TokenStream,
 ) -> syn::Result<proc_macro2::TokenStream> {
-    let variant_name_str = get_variant_name(
-        &variant_name.to_string(),
-        &variant_attributes,
-        container_attributes,
-    );
-    let pattern = generate_variant_pattern(
-        variant_name_str.clone(),
-        variant_index,
-        variant_attributes,
-        by_index,
-    );
-
-    if variant_attributes.skip || variant_attributes.skip_deserializing {
-        return Ok(quote::quote! {
-            #pattern => {
-                return Err(::celkit::core::Error::new(format!(
-                    "Enum variant `{}::{}` cannot be deserialized",
-                    stringify!(#name),
-                    stringify!(#variant_name),
-                )));
-            }
-        });
-    }
-
     let field_handler = UnnamedFieldHandler::new(fields)?;
     let field_names = field_handler.field_names();
     let construction = quote::quote! { Ok(#name::#variant_name(#(#field_names),*)) };
@@ -165,35 +144,9 @@ fn generate_unnamed_enum_deserialize(
 fn generate_unit_enum_deserialize(
     name: &syn::Ident,
     variant_name: &syn::Ident,
-    variant_index: usize,
-    container_attributes: &ContainerAttributes,
-    variant_attributes: &VariantAttributes,
-    by_index: bool,
+    variant_name_str: String,
+    pattern: proc_macro2::TokenStream,
 ) -> syn::Result<proc_macro2::TokenStream> {
-    let variant_name_str = get_variant_name(
-        &variant_name.to_string(),
-        &variant_attributes,
-        container_attributes,
-    );
-    let pattern = generate_variant_pattern(
-        variant_name_str.clone(),
-        variant_index,
-        variant_attributes,
-        by_index,
-    );
-
-    if variant_attributes.skip || variant_attributes.skip_deserializing {
-        return Ok(quote::quote! {
-            #pattern => {
-                return Err(::celkit::core::Error::new(format!(
-                    "Enum variant `{}::{}` cannot be deserialized",
-                    stringify!(#name),
-                    stringify!(#variant_name),
-                )));
-            }
-        });
-    }
-
     Ok(quote::quote! {
         #pattern => {
             match payload {
@@ -230,7 +183,7 @@ pub(super) fn generate_enum_deserialize(
         });
     }
 
-    let variants_by_index = data
+    let variants_from_text = data
         .variants
         .iter()
         .enumerate()
@@ -240,38 +193,38 @@ pub(super) fn generate_enum_deserialize(
             let attributes = &variant.attrs;
             let variant_attributes = parse_variant_attributes(attributes)?;
 
-            match &variant.fields {
-                syn::Fields::Named(fields) => generate_named_enum_deserialize(
-                    name,
-                    variant_name,
-                    variant_index,
-                    fields,
-                    &container_attributes,
-                    &variant_attributes,
-                    true,
-                ),
-                syn::Fields::Unnamed(fields) => generate_unnamed_enum_deserialize(
-                    name,
-                    variant_name,
-                    variant_index,
-                    fields,
-                    &container_attributes,
-                    &variant_attributes,
-                    true,
-                ),
-                syn::Fields::Unit => generate_unit_enum_deserialize(
-                    name,
-                    variant_name,
-                    variant_index,
-                    &container_attributes,
-                    &variant_attributes,
-                    true,
-                ),
+            match process_variant(
+                &variant_name,
+                variant_index,
+                &variant_attributes,
+                container_attributes,
+                &name,
+                false,
+            ) {
+                Ok((variant_name_str, pattern)) => match &variant.fields {
+                    syn::Fields::Unit => {
+                        Ok(quote::quote! { #pattern => { Ok(#name::#variant_name) } })
+                    }
+                    _ => Ok(quote::quote! {
+                        #pattern => {
+                            Err(::celkit::core::Error::new(format!(
+                                "Variant `{}::{}` cannot deserialized from `string`.\n\
+                                Deserializing `enum` variants from `string` is only possible \
+                                for `Unit` variants (variants with no fields e.g. MyEnum::Unit).\n\
+                                Variants with payload such as MyEnum::Struct{{field: Type}} \
+                                or MyEnum::Tuple(Type) are not supported",
+                                stringify!(#name),
+                                #variant_name_str,
+                            )))
+                        }
+                    }),
+                },
+                Err(skip_tokens) => Ok(skip_tokens),
             }
         })
         .collect::<syn::Result<Vec<_>>>()?;
 
-    let variants_by_name = data
+    let variants_from_tuple = data
         .variants
         .iter()
         .enumerate()
@@ -281,33 +234,84 @@ pub(super) fn generate_enum_deserialize(
             let attributes = &variant.attrs;
             let variant_attributes = parse_variant_attributes(attributes)?;
 
-            match &variant.fields {
-                syn::Fields::Named(fields) => generate_named_enum_deserialize(
-                    name,
-                    variant_name,
-                    variant_index,
-                    fields,
-                    &container_attributes,
-                    &variant_attributes,
-                    false,
-                ),
-                syn::Fields::Unnamed(fields) => generate_unnamed_enum_deserialize(
-                    name,
-                    variant_name,
-                    variant_index,
-                    fields,
-                    &container_attributes,
-                    &variant_attributes,
-                    false,
-                ),
-                syn::Fields::Unit => generate_unit_enum_deserialize(
-                    name,
-                    variant_name,
-                    variant_index,
-                    &container_attributes,
-                    &variant_attributes,
-                    false,
-                ),
+            match process_variant(
+                &variant_name,
+                variant_index,
+                &variant_attributes,
+                container_attributes,
+                &name,
+                true,
+            ) {
+                Ok((variant_name_str, pattern)) => match &variant.fields {
+                    syn::Fields::Named(fields) => generate_named_enum_deserialize(
+                        name,
+                        variant_name,
+                        variant_name_str,
+                        fields,
+                        &variant_attributes,
+                        pattern,
+                    ),
+                    syn::Fields::Unnamed(fields) => generate_unnamed_enum_deserialize(
+                        name,
+                        variant_name,
+                        variant_name_str,
+                        fields,
+                        pattern,
+                    ),
+                    syn::Fields::Unit => generate_unit_enum_deserialize(
+                        name,
+                        variant_name,
+                        variant_name_str,
+                        pattern,
+                    ),
+                },
+                Err(skip_tokens) => Ok(skip_tokens),
+            }
+        })
+        .collect::<syn::Result<Vec<_>>>()?;
+
+    let variants_from_object = data
+        .variants
+        .iter()
+        .enumerate()
+        .map(|(i, variant)| {
+            let variant_name = &variant.ident;
+            let variant_index = i;
+            let attributes = &variant.attrs;
+            let variant_attributes = parse_variant_attributes(attributes)?;
+
+            match process_variant(
+                &variant_name,
+                variant_index,
+                &variant_attributes,
+                container_attributes,
+                &name,
+                false,
+            ) {
+                Ok((variant_name_str, pattern)) => match &variant.fields {
+                    syn::Fields::Named(fields) => generate_named_enum_deserialize(
+                        name,
+                        variant_name,
+                        variant_name_str,
+                        fields,
+                        &variant_attributes,
+                        pattern,
+                    ),
+                    syn::Fields::Unnamed(fields) => generate_unnamed_enum_deserialize(
+                        name,
+                        variant_name,
+                        variant_name_str,
+                        fields,
+                        pattern,
+                    ),
+                    syn::Fields::Unit => generate_unit_enum_deserialize(
+                        name,
+                        variant_name,
+                        variant_name_str,
+                        pattern,
+                    ),
+                },
+                Err(skip_tokens) => Ok(skip_tokens),
             }
         })
         .collect::<syn::Result<Vec<_>>>()?;
@@ -316,6 +320,16 @@ pub(super) fn generate_enum_deserialize(
         impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
+                    ::celkit::core::Value::Text(string) => {
+                        match string.as_str() {
+                            #(#variants_from_text)*
+                            _ => Err(::celkit::core::Error::new(format!(
+                                "Unknown `enum` variant `{}::{}`",
+                                stringify!(#name),
+                                string,
+                            )))
+                        }
+                    }
                     ::celkit::core::Value::Tuple(mut tuple) => {
                         if tuple.len() != 2 {
                             return Err(::celkit::core::Error::new(format!(
@@ -337,14 +351,14 @@ pub(super) fn generate_enum_deserialize(
                             ::celkit::core::Value::Number(number) => number.as_usize()?,
                             _ => {
                                 return Err(::celkit::core::Error::new(
-                                    "First member of `Duration` tuple must be a number \
+                                    "First member of `enum` tuple must be a number \
                                     for `variant_index`",
                                 ));
                             }
                         };
 
                         match variant_index {
-                            #(#variants_by_index)*
+                            #(#variants_from_tuple)*
                             _ => Err(::celkit::core::Error::new(format!(
                                 "Unknown `enum` variant index {} for `{}`",
                                 variant_index,
@@ -367,7 +381,7 @@ pub(super) fn generate_enum_deserialize(
                             )))?;
 
                         match variant_name.as_str() {
-                            #(#variants_by_name)*
+                            #(#variants_from_object)*
                             _ => Err(::celkit::core::Error::new(format!(
                                 "Unknown `enum` variant `{}::{}`",
                                 stringify!(#name),
