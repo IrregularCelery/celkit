@@ -584,192 +584,6 @@ impl Serialize for std::time::Duration {
 #[cfg(feature = "std")]
 impl Deserialize for std::time::Duration {
     fn deserialize(value: Value) -> Result<Self> {
-        let extract_secs = |number: Number| -> Result<u64> {
-            match number {
-                Number::U8(n) => Ok(n as u64),
-                Number::I8(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i8` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::U16(n) => Ok(n as u64),
-                Number::I16(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i16` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::U32(n) => Ok(n as u64),
-                Number::I32(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i32` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::U64(n) => Ok(n),
-                Number::I64(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i64` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::U128(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `u128` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::I128(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i128` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::Usize(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `usize` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::Isize(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `isize` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::F32(n) => {
-                    if n < 0.0 || n.is_infinite() || n.is_nan() {
-                        return Err(Error::new(format!(
-                            "`secs` must be a finite non-negative number: {}",
-                            n
-                        )));
-                    }
-
-                    if n > u64::MAX as f32 {
-                        return Err(Error::new(format!(
-                            "`secs` exceeds the bounds for `Duration`: {}",
-                            n
-                        )));
-                    }
-
-                    Ok(n as u64)
-                }
-                Number::F64(n) => {
-                    if n < 0.0 || n.is_infinite() || n.is_nan() {
-                        return Err(Error::new(format!(
-                            "`secs` must be a finite non-negative number: {}",
-                            n
-                        )));
-                    }
-
-                    if n > u64::MAX as f64 {
-                        return Err(Error::new(format!(
-                            "`secs` exceeds the bounds for `Duration`: {}",
-                            n
-                        )));
-                    }
-
-                    Ok(n as u64)
-                }
-            }
-        };
-        let extract_nanos = |number: Number| -> Result<u32> {
-            match number {
-                Number::U8(n) => Ok(n as u32),
-                Number::I8(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i8` number {} to `u32` for `nanos`",
-                        n,
-                    ))
-                }),
-                Number::U16(n) => Ok(n as u32),
-                Number::I16(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i16` number {} to `u32` for `nanos`",
-                        n,
-                    ))
-                }),
-                Number::U32(n) => Ok(n),
-                Number::I32(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i32` number {} to `u32` for `nanos`",
-                        n,
-                    ))
-                }),
-                Number::U64(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `u64` number {} to `u32` for `nanos`",
-                        n,
-                    ))
-                }),
-                Number::I64(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i64` number {} to `u32` for `nanos`",
-                        n,
-                    ))
-                }),
-                Number::U128(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `u128` number {} to `u32` for `nanos`",
-                        n,
-                    ))
-                }),
-                Number::I128(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `i128` number {} to `u32` for `nanos`",
-                        n,
-                    ))
-                }),
-                Number::Usize(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `usize` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::Isize(n) => n.try_into().map_err(|_| {
-                    Error::new(format!(
-                        "Cannot convert `isize` number {} to `u64` for `secs`",
-                        n,
-                    ))
-                }),
-                Number::F32(n) => {
-                    if n < 0.0 || n.is_infinite() || n.is_nan() {
-                        return Err(Error::new(format!(
-                            "`nanos` must be a finite non-negative number: {}",
-                            n
-                        )));
-                    }
-
-                    if n > u32::MAX as f32 {
-                        return Err(Error::new(format!(
-                            "`nanos` exceeds the bounds for `Duration`: {}",
-                            n
-                        )));
-                    }
-
-                    Ok(n as u32)
-                }
-                Number::F64(n) => {
-                    if n < 0.0 || n.is_infinite() || n.is_nan() {
-                        return Err(Error::new(format!(
-                            "`nanos` must be a finite non-negative number: {}",
-                            n
-                        )));
-                    }
-
-                    if n > u32::MAX as f64 {
-                        return Err(Error::new(format!(
-                            "`nanos` exceeds the bounds for `Duration`: {}",
-                            n
-                        )));
-                    }
-
-                    Ok(n as u32)
-                }
-            }
-        };
-
         match value {
             Value::Array(mut array) => {
                 if array.len() != 2 {
@@ -787,7 +601,7 @@ impl Deserialize for std::time::Duration {
                     .expect("This SHOULD never happen because of length check!");
 
                 let secs = match secs_value {
-                    Value::Number(number) => extract_secs(number)?,
+                    Value::Number(number) => number.as_u64()?,
                     _ => {
                         return Err(Error::new(
                             "First item of `Duration` array must be a number for `secs`",
@@ -796,7 +610,7 @@ impl Deserialize for std::time::Duration {
                 };
 
                 let nanos = match nanos_value {
-                    Value::Number(number) => extract_nanos(number)?,
+                    Value::Number(number) => number.as_u32()?,
                     _ => {
                         return Err(Error::new(
                             "Second item of `Duration` array must be a number for `nanos`",
@@ -826,7 +640,7 @@ impl Deserialize for std::time::Duration {
                     .expect("This SHOULD never happen because of length check!");
 
                 let secs = match secs_value {
-                    Value::Number(number) => extract_secs(number)?,
+                    Value::Number(number) => number.as_u64()?,
                     _ => {
                         return Err(Error::new(
                             "First member of `Duration` tuple must be a number for `secs`",
@@ -835,7 +649,7 @@ impl Deserialize for std::time::Duration {
                 };
 
                 let nanos = match nanos_value {
-                    Value::Number(number) => extract_nanos(number)?,
+                    Value::Number(number) => number.as_u32()?,
                     _ => {
                         return Err(Error::new(
                             "Second member of `Duration` tuple must be a number for `nanos`",
@@ -857,7 +671,7 @@ impl Deserialize for std::time::Duration {
                 }
 
                 let secs = match object.remove("secs") {
-                    Some(Value::Number(number)) => extract_secs(number)?,
+                    Some(Value::Number(number)) => number.as_u64()?,
                     _ => {
                         return Err(Error::new(
                             "Expected `Duration` object with a valid numeric `secs` entry",
@@ -866,7 +680,7 @@ impl Deserialize for std::time::Duration {
                 };
 
                 let nanos = match object.remove("nanos") {
-                    Some(Value::Number(number)) => extract_nanos(number)?,
+                    Some(Value::Number(number)) => number.as_u32()?,
                     _ => {
                         return Err(Error::new(
                             "Expected `Duration` object with a valid numeric `nanos` entry",
@@ -952,7 +766,7 @@ impl Deserialize for core::net::IpAddr {
                     .iter()
                     .map(|value| match value {
                         Value::Number(Number::U8(n)) => Ok(*n),
-                        _ => Err(Error::new("Expected number `IpAddr` array item")),
+                        _ => Err(Error::new("Expected `u8` number `IpAddr` array item")),
                     })
                     .collect::<Result<_>>()?;
 
@@ -978,7 +792,7 @@ impl Deserialize for core::net::IpAddr {
                     .iter()
                     .map(|value| match value {
                         Value::Number(Number::U8(n)) => Ok(*n),
-                        _ => Err(Error::new("Expected number `IpAddr` tuple member")),
+                        _ => Err(Error::new("Expected `u8` number `IpAddr` tuple member")),
                     })
                     .collect::<Result<_>>()?;
 
