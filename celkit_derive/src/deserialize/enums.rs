@@ -183,6 +183,49 @@ pub(super) fn generate_enum_deserialize(
         });
     }
 
+    let variants_from_number = data
+        .variants
+        .iter()
+        .enumerate()
+        .map(|(i, variant)| {
+            let variant_name = &variant.ident;
+            let variant_index = i;
+            let attributes = &variant.attrs;
+            let variant_attributes = parse_variant_attributes(attributes)?;
+
+            match process_variant(
+                &variant_name,
+                variant_index,
+                &variant_attributes,
+                container_attributes,
+                &name,
+                true,
+            ) {
+                Ok((variant_name_str, pattern)) => match &variant.fields {
+                    syn::Fields::Unit => {
+                        Ok(quote::quote! { #pattern => { Ok(#name::#variant_name) } })
+                    }
+                    _ => Ok(quote::quote! {
+                        #pattern => {
+                            Err(::celkit::core::Error::new(format!(
+                                "Variant `{}::{} (at index {})` cannot be deserialized from \
+                                `number`.\n\
+                                Deserializing `enum` variants from `number` is only possible \
+                                for `Unit` variants (variants with no fields e.g. MyEnum::Unit).\n\
+                                Variants with payload such as MyEnum::Struct{{field: Type}} \
+                                or MyEnum::Tuple(Type) are not supported",
+                                stringify!(#name),
+                                #variant_name_str,
+                                #variant_index,
+                            )))
+                        }
+                    }),
+                },
+                Err(skip_tokens) => Ok(skip_tokens),
+            }
+        })
+        .collect::<syn::Result<Vec<_>>>()?;
+
     let variants_from_text = data
         .variants
         .iter()
@@ -208,7 +251,7 @@ pub(super) fn generate_enum_deserialize(
                     _ => Ok(quote::quote! {
                         #pattern => {
                             Err(::celkit::core::Error::new(format!(
-                                "Variant `{}::{}` cannot deserialized from `string`.\n\
+                                "Variant `{}::{}` cannot be deserialized from `string`.\n\
                                 Deserializing `enum` variants from `string` is only possible \
                                 for `Unit` variants (variants with no fields e.g. MyEnum::Unit).\n\
                                 Variants with payload such as MyEnum::Struct{{field: Type}} \
@@ -320,8 +363,22 @@ pub(super) fn generate_enum_deserialize(
         impl #impl_generics ::celkit::Deserialize for #name #type_generics #where_clause {
             fn deserialize(value: ::celkit::core::Value) -> ::celkit::core::Result<Self> {
                 match value {
+                    ::celkit::core::Value::Number(number) => {
+                        let variant_index = number.as_usize()?;
+
+                        match variant_index {
+                            #(#variants_from_number)*
+                            _ => Err(::celkit::core::Error::new(format!(
+                                "Unknown `enum` variant index {} for `{}`",
+                                variant_index,
+                                stringify!(#name),
+                            )))
+                        }
+                    }
                     ::celkit::core::Value::Text(string) => {
-                        match string.as_str() {
+                        let variant_name = string.as_str();
+
+                        match variant_name {
                             #(#variants_from_text)*
                             _ => Err(::celkit::core::Error::new(format!(
                                 "Unknown `enum` variant `{}::{}`",
