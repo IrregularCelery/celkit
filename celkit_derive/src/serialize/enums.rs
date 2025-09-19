@@ -63,12 +63,12 @@ fn generate_named_enum_serialize(
             #field_serialization
 
             let mut values = Vec::with_capacity(3);
-            let variant_value = ::celkit::core::Value::Struct(fields);
+            let payload = ::celkit::core::Value::Struct(fields);
 
             // See: "Special-type serialization" at the top of this file
             values.push(("0".to_string(), Value::Null));
             values.push(("#".to_string(), Value::Number(Number::Usize(#variant_index))));
-            values.push((#variant_name_str.to_string(), variant_value));
+            values.push((#variant_name_str.to_string(), payload));
 
             Ok(::celkit::core::Value::Struct(values))
         }
@@ -109,12 +109,12 @@ fn generate_unnamed_enum_serialize(
             #field_serialization
 
             let mut values = Vec::with_capacity(3);
-            let variant_value = ::celkit::core::Value::Tuple(fields);
+            let payload = ::celkit::core::Value::Tuple(fields);
 
             // See: "Special-type serialization" at the top of this file
             values.push(("0".to_string(), Value::Null));
             values.push(("#".to_string(), Value::Number(Number::Usize(#variant_index))));
-            values.push((#variant_name_str.to_string(), variant_value));
+            values.push((#variant_name_str.to_string(), payload));
 
             Ok(::celkit::core::Value::Struct(values))
         }
@@ -151,12 +151,12 @@ pub(super) fn generate_unit_enum_serialize(
             use ::celkit::core::*;
 
             let mut values = Vec::with_capacity(3);
-            let variant_value = ::celkit::core::Value::Null;
+            let payload = ::celkit::core::Value::Null;
 
             // See: "Special-type serialization" at the top of this file
             values.push(("0".to_string(), Value::Null));
             values.push(("#".to_string(), Value::Number(Number::Usize(#variant_index))));
-            values.push((#variant_name_str.to_string(), variant_value));
+            values.push((#variant_name_str.to_string(), payload));
 
             Ok(::celkit::core::Value::Struct(values))
         }
