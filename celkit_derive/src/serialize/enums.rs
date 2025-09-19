@@ -36,13 +36,19 @@ fn generate_named_enum_serialize(
     container_attributes: &ContainerAttributes,
     variant_attributes: &VariantAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    let variant_name_str = get_variant_name(
+        &variant_name.to_string(),
+        &variant_attributes,
+        container_attributes,
+    );
+
     if variant_attributes.skip || variant_attributes.skip_serializing {
         return Ok(quote::quote! {
             #name::#variant_name { .. } => {
                 return Err(::celkit::core::Error::new(format!(
                     "Enum variant `{}::{}` cannot be serialized",
                     stringify!(#name),
-                    stringify!(#variant_name),
+                    #variant_name_str,
                 )));
             }
         });
@@ -52,11 +58,6 @@ fn generate_named_enum_serialize(
     let field_names = field_handler.field_names();
     let field_serialization =
         field_handler.generate_fields_serialize(&variant_attributes.container, quote::quote! {});
-    let variant_name_str = get_variant_name(
-        &variant_name.to_string(),
-        &variant_attributes,
-        container_attributes,
-    );
 
     Ok(quote::quote! {
         #name::#variant_name { #(#field_names),* } => {
@@ -83,13 +84,19 @@ fn generate_unnamed_enum_serialize(
     container_attributes: &ContainerAttributes,
     variant_attributes: &VariantAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    let variant_name_str = get_variant_name(
+        &variant_name.to_string(),
+        &variant_attributes,
+        container_attributes,
+    );
+
     if variant_attributes.skip || variant_attributes.skip_serializing {
         return Ok(quote::quote! {
             #name::#variant_name { .. } => {
                 return Err(::celkit::core::Error::new(format!(
                     "Enum variant `{}::{}` cannot be serialized",
                     stringify!(#name),
-                    stringify!(#variant_name),
+                    #variant_name_str,
                 )));
             }
         });
@@ -98,11 +105,6 @@ fn generate_unnamed_enum_serialize(
     let field_handler = UnnamedFieldHandler::new(fields)?;
     let field_names = field_handler.field_names();
     let field_serialization = field_handler.generate_fields_serialize(false);
-    let variant_name_str = get_variant_name(
-        &variant_name.to_string(),
-        &variant_attributes,
-        container_attributes,
-    );
 
     Ok(quote::quote! {
         #name::#variant_name(#(#field_names),*) => {
@@ -128,23 +130,23 @@ pub(super) fn generate_unit_enum_serialize(
     container_attributes: &ContainerAttributes,
     variant_attributes: &VariantAttributes,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    let variant_name_str = get_variant_name(
+        &variant_name.to_string(),
+        &variant_attributes,
+        container_attributes,
+    );
+
     if variant_attributes.skip || variant_attributes.skip_serializing {
         return Ok(quote::quote! {
             #name::#variant_name { .. } => {
                 return Err(::celkit::core::Error::new(format!(
                     "Enum variant `{}::{}` cannot be serialized",
                     stringify!(#name),
-                    stringify!(#variant_name),
+                    #variant_name_str,
                 )));
             }
         });
     }
-
-    let variant_name_str = get_variant_name(
-        &variant_name.to_string(),
-        &variant_attributes,
-        container_attributes,
-    );
 
     Ok(quote::quote! {
         #name::#variant_name => {

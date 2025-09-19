@@ -48,7 +48,7 @@ fn process_variant(
                 return Err(::celkit::core::Error::new(format!(
                     "Enum variant `{}::{}` cannot be deserialized",
                     stringify!(#enum_name),
-                    stringify!(#variant_name),
+                    #variant_name_str,
                 )));
             }
         });
