@@ -78,14 +78,6 @@ mod mini {
                         return Ok("-inf".to_string());
                     }
 
-                    if *n == 0.0 {
-                        if n.is_sign_positive() {
-                            return Ok("0.0".to_string());
-                        }
-
-                        return Ok("-0.0".to_string());
-                    }
-
                     let abs_n = if *n < 0.0 { -*n } else { *n };
 
                     // For the minified version we almost always use the exponent notation
@@ -309,14 +301,6 @@ mod pretty {
                         }
 
                         return Ok("-inf".to_string());
-                    }
-
-                    if *n == 0.0 {
-                        if n.is_sign_positive() {
-                            return Ok("0.0".to_string());
-                        }
-
-                        return Ok("-0.0".to_string());
                     }
 
                     let abs_n = if *n < 0.0 { -*n } else { *n };
