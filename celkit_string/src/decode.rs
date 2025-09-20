@@ -606,7 +606,7 @@ impl Decoder {
                 Some(true) => {
                     let value = self.decode_value()?;
 
-                    fields.push((String::new(), value));
+                    fields.push((Cow::Borrowed(""), value));
                 }
                 Some(false) => {
                     let is_expecting_value = false;
@@ -639,7 +639,7 @@ impl Decoder {
 
                             let value = self.decode_value()?;
 
-                            fields.push((i, value));
+                            fields.push((i.into(), value));
                         }
                         Token::Eof => {
                             return Err(self.error(format!(

@@ -467,16 +467,16 @@ impl<T: Serialize, E: Serialize> Serialize for core::result::Result<T, E> {
         let mut values = Vec::with_capacity(3);
 
         // See: "Special-type serialization" at the top of this file
-        values.push(("0".to_string(), Value::Null));
+        values.push((Cow::Borrowed("0"), Value::Null));
 
         match self {
             Ok(ok) => {
-                values.push(("#".to_string(), Value::Number(Number::U8(1))));
-                values.push(("Ok".to_string(), ok.serialize()?));
+                values.push((Cow::Borrowed("#"), Value::Number(Number::U8(1))));
+                values.push((Cow::Borrowed("Ok"), ok.serialize()?));
             }
             Err(err) => {
-                values.push(("#".to_string(), Value::Number(Number::U8(0))));
-                values.push(("Err".to_string(), err.serialize()?));
+                values.push((Cow::Borrowed("#"), Value::Number(Number::U8(0))));
+                values.push((Cow::Borrowed("Err"), err.serialize()?));
             }
         };
 
@@ -567,13 +567,13 @@ impl Serialize for std::time::Duration {
         let mut values = Vec::with_capacity(3);
 
         // See: "Special-type serialization" at the top of this file
-        values.push(("0".to_string(), Value::Null));
+        values.push((Cow::Borrowed("0"), Value::Null));
         values.push((
-            "secs".to_string(),
+            Cow::Borrowed("secs"),
             Value::Number(Number::U64(self.as_secs())),
         ));
         values.push((
-            "nanos".to_string(),
+            Cow::Borrowed("nanos"),
             Value::Number(Number::U32(self.subsec_nanos())),
         ));
 
@@ -731,9 +731,9 @@ impl Serialize for core::net::IpAddr {
         let mut values = Vec::with_capacity(3);
 
         // See: "Special-type serialization" at the top of this file
-        values.push(("0".to_string(), Value::Null));
+        values.push((Cow::Borrowed("0"), Value::Null));
         values.push((
-            "#".to_string(),
+            Cow::Borrowed("#"),
             Value::Array({
                 match self {
                     core::net::IpAddr::V4(v4) => v4
@@ -749,7 +749,7 @@ impl Serialize for core::net::IpAddr {
                 }
             }),
         ));
-        values.push(("%".to_string(), Value::Text(self.to_string())));
+        values.push((Cow::Borrowed("%"), Value::Text(self.to_string())));
 
         Ok(Value::Struct(values))
     }
@@ -825,9 +825,9 @@ impl<T: Serialize> Serialize for core::ops::Range<T> {
         let mut values = Vec::with_capacity(3);
 
         // See: "Special-type serialization" at the top of this file
-        values.push(("0".to_string(), Value::Null));
-        values.push(("start".to_string(), self.start.serialize()?));
-        values.push(("end".to_string(), self.end.serialize()?));
+        values.push((Cow::Borrowed("0"), Value::Null));
+        values.push((Cow::Borrowed("start"), self.start.serialize()?));
+        values.push((Cow::Borrowed("end"), self.end.serialize()?));
 
         Ok(Value::Struct(values))
     }
@@ -912,9 +912,9 @@ impl<T: Serialize> Serialize for core::ops::RangeInclusive<T> {
         let mut values = Vec::with_capacity(3);
 
         // See: "Special-type serialization" at the top of this file
-        values.push(("0".to_string(), Value::Null));
-        values.push(("start".to_string(), self.start().serialize()?));
-        values.push(("end".to_string(), self.end().serialize()?));
+        values.push((Cow::Borrowed("0"), Value::Null));
+        values.push((Cow::Borrowed("start"), self.start().serialize()?));
+        values.push((Cow::Borrowed("end"), self.end().serialize()?));
 
         Ok(Value::Struct(values))
     }

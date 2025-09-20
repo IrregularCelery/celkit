@@ -11,6 +11,7 @@ pub mod internal {
     pub use crate::core::{Error, Number, Result, Value};
 
     pub mod sys {
+        pub use alloc::borrow::Cow;
         pub use alloc::boxed::Box;
         pub use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
         pub use alloc::format;

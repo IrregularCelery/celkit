@@ -67,9 +67,9 @@ fn generate_named_enum_serialize(
             let payload = ::celkit::core::Value::Struct(fields);
 
             // See: "Special-type serialization" at the top of this file
-            values.push(("0".to_string(), Value::Null));
-            values.push(("#".to_string(), Value::Number(Number::Usize(#variant_index))));
-            values.push((#variant_name_str.to_string(), payload));
+            values.push((Cow::Borrowed("0"), Value::Null));
+            values.push((Cow::Borrowed("#"), Value::Number(Number::Usize(#variant_index))));
+            values.push((#variant_name_str.into(), payload));
 
             Ok(::celkit::core::Value::Struct(values))
         }
@@ -114,9 +114,9 @@ fn generate_unnamed_enum_serialize(
             let payload = ::celkit::core::Value::Tuple(fields);
 
             // See: "Special-type serialization" at the top of this file
-            values.push(("0".to_string(), Value::Null));
-            values.push(("#".to_string(), Value::Number(Number::Usize(#variant_index))));
-            values.push((#variant_name_str.to_string(), payload));
+            values.push((Cow::Borrowed("0"), Value::Null));
+            values.push((Cow::Borrowed("#"), Value::Number(Number::Usize(#variant_index))));
+            values.push((#variant_name_str.into(), payload));
 
             Ok(::celkit::core::Value::Struct(values))
         }
@@ -156,9 +156,9 @@ pub(super) fn generate_unit_enum_serialize(
             let payload = ::celkit::core::Value::Null;
 
             // See: "Special-type serialization" at the top of this file
-            values.push(("0".to_string(), Value::Null));
-            values.push(("#".to_string(), Value::Number(Number::Usize(#variant_index))));
-            values.push((#variant_name_str.to_string(), payload));
+            values.push((Cow::Borrowed("0"), Value::Null));
+            values.push((Cow::Borrowed("#"), Value::Number(Number::Usize(#variant_index))));
+            values.push((#variant_name_str.into(), payload));
 
             Ok(::celkit::core::Value::Struct(values))
         }

@@ -165,7 +165,7 @@ mod mini {
             ))
         }
 
-        fn encode_struct(&self, value: &Vec<(String, Value)>) -> Result<String> {
+        fn encode_struct(&self, value: &Vec<(Cow<'static, str>, Value)>) -> Result<String> {
             // Check for special types with discriminant
             // See: "Special-type serialization" in `celkit_core::impls.rs`
             if matches!(value.first(), Some((field_name, _)) if field_name == "0") {
@@ -174,13 +174,13 @@ mod mini {
                     .filter(
                         |(key, _)| key != "0" /* marker */ && key != "#", /* data-only field */
                     )
-                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .map(|(key, value)| (key.to_string(), value.clone()))
                     .collect();
 
                 // If there's only one value with key "%", flatten it instead of wrapping
                 if values.len() == 1 {
                     if let Some((key, value)) = values.iter().next() {
-                        if key == "%"
+                        if *key == "%"
                         /* verbose-only */
                         {
                             return self.encode_value(value);
@@ -747,7 +747,7 @@ mod pretty {
 
         fn encode_struct(
             &self,
-            value: &Vec<(String, Value)>,
+            value: &Vec<(Cow<'static, str>, Value)>,
             depth: usize,
             available_line_length: Option<usize>,
         ) -> Result<String> {
@@ -768,13 +768,13 @@ mod pretty {
                     .filter(
                         |(key, _)| key != "0" /* marker */ && key != "#", /* data-only field */
                     )
-                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .map(|(key, value)| (key.to_string(), value.clone()))
                     .collect();
 
                 // If there's only one value with key "%", flatten it instead of wrapping
                 if values.len() == 1 {
                     if let Some((key, value)) = values.iter().next() {
-                        if key == "%"
+                        if *key == "%"
                         /* verbose-only */
                         {
                             return self.encode_value(value, depth, available_line_length);

@@ -45,7 +45,7 @@ impl<'a> NamedFieldHandler<'a> {
 
                 quote::quote! {
                     fields.push((
-                        #field_name_str.to_string(),
+                        #field_name_str.into(),
                         #root_format #field_name.serialize()?
                     ));
                 }
@@ -112,7 +112,7 @@ impl UnnamedFieldHandler {
 
                     return quote::quote! {
                         fields.push((
-                            String::new(),
+                            Cow::Borrowed(""),
                             self.#index.serialize()?
                         ));
                     };

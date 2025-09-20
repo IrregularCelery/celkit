@@ -486,7 +486,7 @@ pub enum Value {
     Array(Vec<Value>),
     Tuple(Vec<Value>),
     Object(BTreeMap<String, Value>),
-    Struct(Vec<(String, Value)>),
+    Struct(Vec<(Cow<'static, str>, Value)>),
 }
 
 #[derive(Debug)]
@@ -528,7 +528,7 @@ impl core::fmt::Display for Error {
             (Some(line), Some(column)) => {
                 write!(
                     f,
-                    "Parse error at line {}, column {}: {}",
+                    "Celkit error:\n\nParse error at line {}, column {}: {}",
                     line, column, self.message
                 )?;
 
@@ -539,7 +539,7 @@ impl core::fmt::Display for Error {
                 Ok(())
             }
             _ => {
-                write!(f, "Error: {}", self.message)?;
+                write!(f, "Celkit error:\n\n{}", self.message)?;
 
                 Ok(())
             }
