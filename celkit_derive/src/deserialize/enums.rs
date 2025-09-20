@@ -397,12 +397,9 @@ pub(super) fn generate_enum_deserialize(
                         }
 
                         // Pop in reverse order
-                        let payload = tuple
-                            .pop()
-                            .expect("This SHOULD never happen because of length check!");
-                        let discriminant = tuple
-                            .pop()
-                            .expect("This SHOULD never happen because of length check!");
+                        // Safe unwrap: Length already checked above
+                        let payload = tuple.pop().unwrap();
+                        let discriminant = tuple.pop().unwrap();
 
                         let variant_index = match discriminant {
                             ::celkit::core::Value::Number(number) => number.as_usize()?,

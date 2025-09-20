@@ -65,8 +65,7 @@ macro_rules! impl_for_tuple {
             fn deserialize(value: Value) -> Result<Self> {
                 match value {
                     Value::Tuple(tuple) => {
-                        const EXPECTED_LEN: usize = 0
-                            $(+ { let _ = stringify!($member); 1 })*;
+                        const EXPECTED_LEN: usize = 0 $(+ { let _ = stringify!($member); 1 })*;
 
                         if tuple.len() != EXPECTED_LEN {
                             return Err(Error::new(format!(
@@ -79,9 +78,8 @@ macro_rules! impl_for_tuple {
                         let mut tuple_iter = tuple.into_iter();
 
                         Ok(($(
-                            $member::deserialize(tuple_iter.next().expect(
-                                "This SHOULD never happen because of length check!"
-                            ))?
+                            // Safe unwrap: Length already checked above
+                            $member::deserialize(tuple_iter.next().unwrap())?
                         ),+,))
                     }
                     _ => Err(Error::new("Expected `tuple`")),
@@ -496,12 +494,9 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
                 }
 
                 // Pop in reverse order
-                let value = array
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
-                let discriminant = array
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
+                // Safe unwrap: Length already checked above
+                let value = array.pop().unwrap();
+                let discriminant = array.pop().unwrap();
 
                 match discriminant {
                     Value::Number(number) if number.as_u8()? == 1 => Ok(Ok(T::deserialize(value)?)),
@@ -520,12 +515,9 @@ impl<T: Deserialize, E: Deserialize> Deserialize for core::result::Result<T, E> 
                 }
 
                 // Pop in reverse order
-                let value = tuple
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
-                let discriminant = tuple
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
+                // Safe unwrap: Length already checked above
+                let value = tuple.pop().unwrap();
+                let discriminant = tuple.pop().unwrap();
 
                 match discriminant {
                     Value::Number(number) if number.as_u8()? == 1 => Ok(Ok(T::deserialize(value)?)),
@@ -593,12 +585,9 @@ impl Deserialize for std::time::Duration {
                 }
 
                 // Pop in reverse order
-                let nanos_value = array
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
-                let secs_value = array
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
+                // Safe unwrap: Length already checked above
+                let nanos_value = array.pop().unwrap();
+                let secs_value = array.pop().unwrap();
 
                 let secs = match secs_value {
                     Value::Number(number) => number.as_u64()?,
@@ -632,12 +621,9 @@ impl Deserialize for std::time::Duration {
                 }
 
                 // Pop in reverse order
-                let nanos_value = tuple
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
-                let secs_value = tuple
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
+                // Safe unwrap: Length already checked above
+                let nanos_value = tuple.pop().unwrap();
+                let secs_value = tuple.pop().unwrap();
 
                 let secs = match secs_value {
                     Value::Number(number) => number.as_u64()?,
@@ -844,12 +830,9 @@ impl<T: Deserialize> Deserialize for core::ops::Range<T> {
                 }
 
                 // Pop in reverse order
-                let end = array
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
-                let start = array
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
+                // Safe unwrap: Length already checked above
+                let end = array.pop().unwrap();
+                let start = array.pop().unwrap();
 
                 Ok(core::ops::Range {
                     start: T::deserialize(start)?,
@@ -864,12 +847,9 @@ impl<T: Deserialize> Deserialize for core::ops::Range<T> {
                 }
 
                 // Pop in reverse order
-                let end = tuple
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
-                let start = tuple
-                    .pop()
-                    .expect("This SHOULD never happen because of length check!");
+                // Safe unwrap: Length already checked above
+                let end = tuple.pop().unwrap();
+                let start = tuple.pop().unwrap();
 
                 Ok(core::ops::Range {
                     start: T::deserialize(start)?,
@@ -1103,11 +1083,8 @@ macro_rules! impl_for_struct {
 
                             $(
                                 let $field_name = {
-                                    let (_, field_value) = fields_iter
-                                        .next()
-                                        .expect(
-                                            "This SHOULD never happen because of length check!"
-                                        );
+                                    // Safe unwrap: Length already checked above
+                                    let (_, field_value) = fields_iter.next().unwrap();
 
                                     <$field_type>::deserialize(field_value)?
                                 };

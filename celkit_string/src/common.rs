@@ -1,5 +1,4 @@
 // TODO: Make error messages more consistant across components
-// TODO: Change the .expect() error messages
 // TODO: It's probably better to have multiple Error::new() methods for separating serializing
 // and deserializing, e.g. Error::serialize(), Error::deserializ() to make better error message.
 // TODO: Change the `abs_n` to use the bitwise of the float instead of manual check.

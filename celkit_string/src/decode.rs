@@ -76,12 +76,9 @@ impl Decoder {
     }
 
     fn skip_comment_and_whitespace(&mut self) -> Result<()> {
-        let comment_marker = Token::CommentMarker
-            .to_char()
-            .expect("This SHOULD never happen for single-char tokens!");
-        let comment_multiline = Token::CommentMultiline
-            .to_char()
-            .expect("This SHOULD never happen for single-char tokens!");
+        // Safe unwrap: single-char tokens are guaranteed to have a `char`
+        let comment_marker = Token::CommentMarker.to_char().unwrap();
+        let comment_multiline = Token::CommentMultiline.to_char().unwrap();
 
         loop {
             // Skip whitespaces
@@ -457,7 +454,7 @@ impl Decoder {
         )))
     }
 
-    fn find_identifier_or_keyword(&mut self, expected_identifier: bool) -> Result<Token> {
+    fn find_identifier_or_keyword(&mut self, expecting_identifier: bool) -> Result<Token> {
         let start = self.position;
 
         // Handle raw identifier (r#keyword)
@@ -484,7 +481,7 @@ impl Decoder {
         let identifier: String = self.input[start..self.position].iter().collect();
         let identifier_lower = identifier.to_lowercase();
 
-        if expected_identifier {
+        if expecting_identifier {
             return Ok(Token::Identifier(identifier));
         }
 
@@ -498,7 +495,7 @@ impl Decoder {
         }
     }
 
-    fn next_token_with_context(&mut self, expected_value: bool) -> Result<Token> {
+    fn next_token_with_context(&mut self, expecting_value: bool) -> Result<Token> {
         self.skip_comment_and_whitespace()?;
 
         match self.current_char {
@@ -506,7 +503,7 @@ impl Decoder {
             Some('"') => self.find_literal(),
             Some(c) if c.is_ascii_digit() || c == '+' || c == '-' => self.find_numeric(),
             Some(c) if c.is_alphabetic() || c == '_' => {
-                self.find_identifier_or_keyword(!expected_value)
+                self.find_identifier_or_keyword(!expecting_value)
             }
             Some(c) => self.find_char(c),
         }
@@ -658,9 +655,7 @@ impl Decoder {
                         }
                     }
                 }
-                None => unreachable!(
-                    "This SHOULD never happen because `is_unnamed_struct` is always something!"
-                ),
+                None => unreachable!("`is_unnamed_struct` is always something"),
             }
 
             is_empty = false;
@@ -852,7 +847,7 @@ impl Decoder {
                 Token::Separator
             ))),
             Token::CommentMarker | Token::CommentMultiline => {
-                unreachable!("This SHOULD never happen because comments are already skipped!")
+                unreachable!("Comments are already skipped")
             }
             Token::Literal(l) => Ok(Value::Text(l)),
             Token::Numeric(n) => Ok(Value::Number(n)),
