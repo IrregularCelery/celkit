@@ -1008,6 +1008,25 @@ impl<T: Deserialize> Deserialize for std::cell::RefCell<T> {
     }
 }
 
+// ----------------------------- PathBuf ------------------------------- //
+
+#[cfg(feature = "std")]
+impl Serialize for std::path::PathBuf {
+    fn serialize(&self) -> Result<Value> {
+        Ok(Value::Text(self.to_string_lossy().into_owned()))
+    }
+}
+
+#[cfg(feature = "std")]
+impl Deserialize for std::path::PathBuf {
+    fn deserialize(value: Value) -> Result<Self> {
+        match value {
+            Value::Text(string) => Ok(std::path::PathBuf::from(string)),
+            _ => Err(Error::new("Expected `PathBuf` string")),
+        }
+    }
+}
+
 // ------------------------------- Struct --------------------------------- //
 
 #[macro_export]
